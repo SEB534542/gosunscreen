@@ -4,7 +4,7 @@ import "fmt"
 
 func main() {
 	fmt.Println("Welkom")
-	//TODO: Set vars
+	//TODO: Set vars using func init()
 	//TODO: configure GPIO
 	//TODO: init: move sunscreen (up)
 	//TODO: add cases: time < sunrise / time > sunset / x minutes before sunset
