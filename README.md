@@ -1,2 +1,2 @@
 # gosunscreen
-*Golang script to control sunscreen
+*Golang script to control sunscreen*
