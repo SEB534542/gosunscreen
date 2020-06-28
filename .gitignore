@@ -50,3 +50,5 @@ builds/**/images/*
 # security / ssl
 *.pem
 *.xxjson
+
+temp.go
