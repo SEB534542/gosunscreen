@@ -2,19 +2,24 @@ package main
 
 import "fmt"
 
-type person struct {
-	first string
+type door struct {
+	position string
 }
 
-func (p person) changeName() {
-	p.first = "Person2"
-	fmt.Println(p.first)
+func (d *door) move() {
+	// Open door
+	d.position = "open"
+	fmt.Printf("Door position is changed to %s\n", d.position)
 }
 
 func main() {
-	p1 := person{"Person1"}
-	p1.changeName()
-	fmt.Println(p1.first)
+	door1 := &door{"closed"}
+	door1.move()
+	fmt.Printf("Door is %s\n", door1.position)
+	//Expected: "open", Result: "closed
+	fmt.Printf("%T\n", door1)
+	door1.position = "new"
+	fmt.Println(door1.position)
 }
 
 // 	const sunriseTime string = "1s:f0"
