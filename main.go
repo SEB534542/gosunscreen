@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -51,9 +52,9 @@ func (s *sunscreen) up() {
 }
 
 // Measure light from specified GPIO pin and return value
-func (ls *lightSensor) getData() {
+func (ls *lightSensor) getCurrentLight() int {
 	// TODO: measure light
-	ls.data = append(ls.data, 5, 3, 2)
+	return 5
 }
 
 // Based on the received string time (format hh:mm) and the day offset, the func returns a type time with today's date + the offset in days
@@ -75,6 +76,8 @@ func stoTime(t string, days int) time.Time {
 
 func main() {
 	log.Println("--------Start of program--------")
+
+	var counter int
 
 	ls1 := &lightSensor{
 		pinLight: 16,
@@ -98,6 +101,7 @@ func main() {
 	case sunset.Sub(time.Now()) <= 0:
 		log.Printf("Sun is down (%v), adjusting sunrise/set to tomorrow", sunset)
 		sunscreenMain.up()
+		ls1.data = []int{}
 		sunrise = sunrise.AddDate(0, 0, 1)
 		sunset = sunset.AddDate(0, 0, 1)
 		fallthrough
@@ -106,36 +110,53 @@ func main() {
 		sunscreenMain.up()
 	}
 
-	ls1.getData()
-	//fmt.Println("Light is:", ls1.data)
+	ls1.data = append(ls1.data, ls1.getCurrentLight())
+	if len(ls1.data) > 15 {
+		ls1.data = ls1.data[(len(ls1.data) - 15):(len(ls1.data))]
 
-	switch sunscreenMain.position {
-	case "up":
-		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", sunscreenMain.position)
-	case "down":
-		log.Printf("Sunscreen is %v.\n", sunscreenMain.position)
+		counter = 0
+		switch sunscreenMain.position {
+		case "up":
+			log.Printf("Sunscreen is %v. Check if weather is good to go down\n", sunscreenMain.position)
+			//for _, v := range ls1.data[]
+		case "down":
+			log.Printf("Sunscreen is %v.\n", sunscreenMain.position)
+		}
+
+		data := []int{2, 3, 4, 5, 6, 7, 8, 10}
+		i := 3
+		j := len(data)
+		requiredValue := 5
+		counter = 0
+		for _, v := range data[i:j] {
+			if v <= requiredValue {
+				counter++
+			}
+		}
+		fmt.Println(counter)
 	}
-
+	// def check_light(required_value, threshold):
+	// result = False
+	// count = 0
 	// if sunscreen_status == 'up':
-	//
-	//                 logging.debug('Check if light enough...')
-	//                 if check_light(required_value=light_variables['good']['value'],
-	//                                threshold=light_variables['good']['threshold']):
-	//                     logging.debug('Enough light, move sunscreen down...')
-	//                     move_sunscreen()
-	//                 else:
-	//                     logging.debug('Not enough light to move the sunscreen down...')
-	//         elif sunscreen_status == 'down':
-	//             if check_light(required_value=light_variables['neutral']['value'],
-	//                            threshold=light_variables['neutral']['threshold']) \
-	//                     or check_light(required_value=light_variables['bad']['value'],
-	//                                    threshold=light_variables['bad']['threshold']):
-	//                 logging.debug('Too little light, move sunscreen up...')
-	//                 move_sunscreen()
-	//             else:
-	//                 logging.debug('Enough light to keep sunscreen down...')
-
-	//TODO: configure GPIO
+	//     for i in range(1, threshold+allowed_deviation+1):
+	//         try:
+	//             if light_list[i * -1] <= required_value:
+	//                 count += 1
+	//         except IndexError:
+	//             # List is smaller than threshold
+	//             pass
+	// if sunscreen_status == 'down':
+	//     for i in range(1, threshold+allowed_deviation+1):
+	//         try:
+	//             if light_list[i * -1] >= required_value:
+	//                 count += 1
+	//         except IndexError:
+	//             # List is smaller than threshold
+	//             pass
+	// if count >= threshold:
+	//     result = True
+	// return result
 	//TODO: add cases: sunscreen up / down vs weather
 	//TODO: defer: GPIO clean-up + move sunscreen
 	//TODO: add keyboard interrupt
