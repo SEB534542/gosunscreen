@@ -51,4 +51,4 @@ builds/**/images/*
 *.pem
 *.xxjson
 
-temp.go
+# temp.go
