@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-// https://pkg.go.dev/github.com/stianeikeland/go-rpio?tab=doc
+// https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
+// import "github.com/stianeikeland/go-rpio/v4"
+
 
 var sunrise = stoTime("10:00", 0)    // Time after which sunscreen can shine on the sunscreen area
 var sunset = stoTime("23:00", 0)     // Time after which sunscreen no can shine on the sunscreen area
