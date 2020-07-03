@@ -100,12 +100,13 @@ func (s *sunscreen) reviewPosition(lightData []int) {
 	}
 }
 
-// getCurrentLight collects the input from the light sensor ls and returns the value as a slice of int
+// GetCurrentLight collects the input from the light sensor ls and returns the value as a slice of int
 func (ls *lightSensor) getCurrentLight() []int {
 	// TODO: measure light
 	return []int{5}
 }
 
+// MaxIntSlice receives variadic parameter of integers and return the highest integer
 func maxIntSlice(xi ...int) int {
 	var max int
 	for i, v := range xi {

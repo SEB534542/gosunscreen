@@ -9,7 +9,7 @@ func TestSetTime(t *testing.T) {
 	type test struct {
 		dataTime  string
 		dataDelta int
-		answer    time.Time
+		expected  time.Time
 	}
 
 	tests := []test{
@@ -24,8 +24,37 @@ func TestSetTime(t *testing.T) {
 	for _, v := range tests {
 		x := stoTime(v.dataTime, v.dataDelta)
 
-		if x != v.answer {
-			t.Error("Expected", v.answer, "Got", x)
+		if x != v.expected {
+			t.Error("Expected", v.expected, "Got", x)
+		}
+	}
+}
+
+func TestMove(t *testing.T) {
+
+	type test struct {
+		position string
+		expected string
+	}
+
+	tests := []test{
+		{"up", "down"},
+		{"down", "up"},
+		{"hallo", "up"},
+	}
+
+	for _, v := range tests {
+		s := &sunscreen{
+			secDown:  17,
+			secUp:    20,
+			position: v.position,
+			pinDown:  40,
+			pinUp:    38,
+		}
+		s.move()
+		x := v.expected
+		if s.position != x {
+			t.Error("Expected", v.expected, "Got", x)
 		}
 	}
 }
