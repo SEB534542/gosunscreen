@@ -10,26 +10,30 @@ import (
 // https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
 // import "github.com/stianeikeland/go-rpio/v4"
 
-var sunrise = stoTime("10:00", 0)              // Time after which sunscreen can shine on the sunscreen area
-var sunset = stoTime("23:00", 0)               // Time after which sunscreen no can shine on the sunscreen area
-const sunsetThreshold int = 70                 // minutes before sunset that sunscreen no longer should go down
-const interval time.Duration = 5 * time.Second // interval for checking current light in seconds
-const lightGoodValue int = 9                   // max measured light value that counts as "good weather"
-const ligthGoodThreshold int = 15              // number of times light should be below lightGoodValue
-const lightNeutralValue int = 9                // max measured light value that counts as "neutral weather"
-const ligthNeutralThreshold int = 15           // number of times light should be above lightNeutralValue
-const lightBadValue int = 9                    // max measured light value that counts as "bad weather"
-const ligthBadThreshold int = 15               // number of times light should be above lightBadValue
-const allowedOutliers int = 2                  // number of outliers accepted in the measurement
+var sunrise = stoTime("10:00", 0)    // Time after which sunscreen can shine on the sunscreen area
+var sunset = stoTime("23:00", 0)     // Time after which sunscreen no can shine on the sunscreen area
+const sunsetThreshold int = 70       // minutes before sunset that sunscreen no longer should go down
+const interval int = 1               // interval for checking current light in seconds
+const lightGoodValue int = 9         // max measured light value that counts as "good weather"
+const ligthGoodThreshold int = 15    // number of times light should be below lightGoodValue
+const lightNeutralValue int = 9      // max measured light value that counts as "neutral weather"
+const ligthNeutralThreshold int = 15 // number of times light should be above lightNeutralValue
+const lightBadValue int = 9          // max measured light value that counts as "bad weather"
+const ligthBadThreshold int = 15     // number of times light should be above lightBadValue
+const allowedOutliers int = 2        // number of outliers accepted in the measurement
 
 const up string = "up"
 const down string = "down"
+const unknown string = "unknown"
+const auto string = "auto"
+const manual string = "manual"
 
 // A Sunscreen represents a physical sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type sunscreen struct {
+	mode     string // Mode of sunscreen auto or manual
+	position string // Current position of sunscreen
 	secDown  int    // Seconds to move sunscreen down
 	secUp    int    // Seconds to move sunscreen up
-	position string // Current position of sunscreen
 	pinDown  int    // GPIO pin for moving sunscreen down
 	pinUp    int    // GPIO pin for moving sunscreen up
 }
@@ -45,10 +49,12 @@ func (s *sunscreen) move() {
 	if s.position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up", s.position)
 		// TODO: move sunscreen up
+		// TODO: lock s.position
 		s.position = up
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down", s.position)
 		// TODO: move sunscreen down
+		// TODO: lock s.position
 		s.position = down
 	}
 }
@@ -134,8 +140,51 @@ func stoTime(t string, days int) time.Time {
 	return time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day()+days, int(timeHour), int(timeMinute), 0, 0, time.Local)
 }
 
+func (s *sunscreen) autoSunscreen(ls *lightSensor) {
+	for {
+		switch {
+		case sunset.Sub(time.Now()).Minutes() <= float64(sunsetThreshold) && sunset.Sub(time.Now()).Minutes() > 0 && s.position == up:
+			log.Printf("Sun will set in (less then) %v min and sunscreen is %v. Snoozing until sunset\n", sunsetThreshold, s.position)
+			// TODO: Snooze until sunset
+		case sunset.Sub(time.Now()) <= 0:
+			log.Printf("Sun is down (%v), adjusting sunrise/set to tomorrow", sunset)
+			s.up()
+			ls.data = []int{}
+			sunrise = sunrise.AddDate(0, 0, 1)
+			sunset = sunset.AddDate(0, 0, 1)
+			fallthrough
+		case sunrise.Sub(time.Now()) > 0:
+			log.Printf("Sun is not yet up, snoozing until %v", sunrise)
+			s.up()
+		}
+		maxLen := maxIntSlice(ligthGoodThreshold+allowedOutliers, ligthBadThreshold+allowedOutliers, ligthNeutralThreshold+allowedOutliers)
+		if len(ls.data) > maxLen {
+			ls.data = ls.data[:maxLen]
+			log.Println(len(ls.data), ls.data)
+			s.reviewPosition(ls.data)
+		}
+		log.Println("Completed cycle, sleeping...")
+		for i := 0; i <= interval; i++ {
+			//TODO abort function if s.mode != auto
+			if s.mode != auto {
+				return
+			}
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+func (ls *lightSensor) monitorLight() {
+	for {
+		// TODO: reserve ls.data
+		ls.data = append(ls.getCurrentLight(), ls.data...)
+		for i := 0; i < interval; i++ {
+			time.Sleep(time.Second)
+		}
+	}
+}
+
 func main() {
-	log.Println("--------Start of program--------")
 
 	ls1 := &lightSensor{
 		pinLight: 16,
@@ -143,43 +192,23 @@ func main() {
 	}
 
 	sunscreenMain := &sunscreen{
+		mode:     auto,
+		position: unknown,
 		secDown:  17,
 		secUp:    20,
-		position: "unknown",
 		pinDown:  40,
 		pinUp:    38,
 	}
-	sunscreenMain.move()
+
+	log.Println("--------Start of program--------")
+	go sunscreenMain.move()
 	defer func() {
 		log.Println("Closing down...")
 		sunscreenMain.up()
 	}()
-
+	go ls1.monitorLight()
+	go sunscreenMain.autoSunscreen(ls1)
 	for {
-		switch {
-		case sunset.Sub(time.Now()).Minutes() <= float64(sunsetThreshold) && sunset.Sub(time.Now()).Minutes() > 0 && sunscreenMain.position == up:
-			log.Printf("Sun will set in (less then) %v min and sunscreen is %v. Snoozing until sunset\n", sunsetThreshold, sunscreenMain.position)
-			// TODO: Snooze until sunset
-		case sunset.Sub(time.Now()) <= 0:
-			log.Printf("Sun is down (%v), adjusting sunrise/set to tomorrow", sunset)
-			sunscreenMain.up()
-			ls1.data = []int{}
-			sunrise = sunrise.AddDate(0, 0, 1)
-			sunset = sunset.AddDate(0, 0, 1)
-			fallthrough
-		case sunrise.Sub(time.Now()) > 0:
-			log.Printf("Sun is not yet up, snoozing until %v", sunrise)
-			sunscreenMain.up()
-		}
 
-		ls1.data = append(ls1.getCurrentLight(), ls1.data...)
-
-		if len(ls1.data) > maxIntSlice(lightGoodValue, lightBadValue, lightNeutralValue) {
-			ls1.data = ls1.data[:15]
-			sunscreenMain.reviewPosition(ls1.data)
-		}
-
-		log.Println("Completed cycle, sleeping...")
-		time.Sleep(interval)
 	}
 }
