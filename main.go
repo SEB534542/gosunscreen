@@ -4,13 +4,14 @@ package main
 import (
 	"log"
 	"strconv"
+	"sync"
 	"time"
 )
 
 // https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
 // import "github.com/stianeikeland/go-rpio/v4"
 
-var sunrise = stoTime("10:00", 0)    // Time after which sunscreen can shine on the sunscreen area
+var sunrise = stoTime("18:23", 0)    // Time after which sunscreen can shine on the sunscreen area
 var sunset = stoTime("23:00", 0)     // Time after which sunscreen no can shine on the sunscreen area
 const sunsetThreshold int = 70       // minutes before sunset that sunscreen no longer should go down
 const interval int = 1               // interval for checking current light in seconds
@@ -28,6 +29,8 @@ const unknown string = "unknown"
 const auto string = "auto"
 const manual string = "manual"
 
+var mu sync.Mutex
+
 // A Sunscreen represents a physical sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type sunscreen struct {
 	mode     string // Mode of sunscreen auto or manual
@@ -38,13 +41,13 @@ type sunscreen struct {
 	pinUp    int    // GPIO pin for moving sunscreen up
 }
 
-// A LightSensor represents a physical lightsensor which data can be collected through a GPIO pin.
+// A LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
 	pinLight int   // pin for retrieving light value
 	data     []int // collected light values
 }
 
-// Move moves the suncreen up or down based on the sunscreen.position. It updates the position accordingly.
+// Move moves the suncreen up or down based on the Sunscreen.position. It updates the position accordingly.
 func (s *sunscreen) move() {
 	if s.position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up", s.position)
@@ -66,7 +69,7 @@ func (s *sunscreen) up() {
 	}
 }
 
-// ReviewPosition reviews the position of the sunscreen against the light data and moves the sunscreen up or down if it meets the criteria
+// ReviewPosition reviews the position of the sunscreen against the lightData and moves the sunscreen up or down if it meets the criteria
 func (s *sunscreen) reviewPosition(lightData []int) {
 	counter := 0
 	switch s.position {
@@ -149,24 +152,32 @@ func (s *sunscreen) autoSunscreen(ls *lightSensor) {
 		case sunset.Sub(time.Now()) <= 0:
 			log.Printf("Sun is down (%v), adjusting sunrise/set to tomorrow", sunset)
 			s.up()
-			ls.data = []int{}
 			sunrise = sunrise.AddDate(0, 0, 1)
 			sunset = sunset.AddDate(0, 0, 1)
 			fallthrough
 		case sunrise.Sub(time.Now()) > 0:
-			log.Printf("Sun is not yet up, snoozing until %v", sunrise)
+			log.Printf("Sun is not yet up, snoozing until %v...", sunrise)
 			s.up()
+			time.Sleep(sunrise.Sub(time.Now()))
+			log.Printf("Sun is up")
+			mu.Lock()
+			ls.data = []int{}
+			mu.Unlock()
+			go ls.monitorLight()
 		}
 		maxLen := maxIntSlice(ligthGoodThreshold+allowedOutliers, ligthBadThreshold+allowedOutliers, ligthNeutralThreshold+allowedOutliers)
+		mu.Lock()
 		if len(ls.data) > maxLen {
 			ls.data = ls.data[:maxLen]
 			log.Println(len(ls.data), ls.data)
 			s.reviewPosition(ls.data)
 		}
+		mu.Unlock()
 		log.Println("Completed cycle, sleeping...")
 		for i := 0; i <= interval; i++ {
 			//TODO abort function if s.mode != auto
 			if s.mode != auto {
+				log.Println("Mode is no longer auto, closing auto func")
 				return
 			}
 			time.Sleep(time.Second)
@@ -176,8 +187,13 @@ func (s *sunscreen) autoSunscreen(ls *lightSensor) {
 
 func (ls *lightSensor) monitorLight() {
 	for {
-		// TODO: reserve ls.data
+		mu.Lock()
 		ls.data = append(ls.getCurrentLight(), ls.data...)
+		mu.Unlock()
+		if sunset.Sub(time.Now()) <= 0 {
+			log.Printf("Sun is down (%v), shutting down light", sunset)
+			return
+		}
 		for i := 0; i < interval; i++ {
 			time.Sleep(time.Second)
 		}
@@ -205,6 +221,7 @@ func main() {
 	defer func() {
 		log.Println("Closing down...")
 		sunscreenMain.up()
+		// TODO: close down ls?
 	}()
 	go ls1.monitorLight()
 	go sunscreenMain.autoSunscreen(ls1)
