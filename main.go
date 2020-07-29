@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"github.com/stianeikeland/go-rpio"
 )
 
 // https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
@@ -37,13 +38,13 @@ type sunscreen struct {
 	position string // Current position of sunscreen
 	secDown  int    // Seconds to move sunscreen down
 	secUp    int    // Seconds to move sunscreen up
-	pinDown  int    // GPIO pin for moving sunscreen down
-	pinUp    int    // GPIO pin for moving sunscreen up
+	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
 }
 
 // A LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight int   // pin for retrieving light value
+	pinLight rpio.Pin   // pin for retrieving light value
 	data     []int // collected light values
 }
 
@@ -51,14 +52,20 @@ type lightSensor struct {
 func (s *sunscreen) move() {
 	if s.position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up", s.position)
-		// TODO: move sunscreen up
-		// TODO: lock s.position
+		s.pinUp.Low()
+		time.Sleep(time.Second * s.secUp)
+		s.pinUp.High()
+		mu.Lock()
 		s.position = up
+		mu.Unlock()
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down", s.position)
-		// TODO: move sunscreen down
-		// TODO: lock s.position
+		s.pinDown.Low()
+		time.Sleep(time.Second * s.secDown)
+		s.pinDown.High()
+		mu.Lock()
 		s.position = down
+		mu.Unlock()
 	}
 }
 
@@ -203,7 +210,7 @@ func (ls *lightSensor) monitorLight() {
 func main() {
 
 	ls1 := &lightSensor{
-		pinLight: 16,
+		pinLight: rpio.Pin(23),
 		data:     []int{},
 	}
 
@@ -212,8 +219,16 @@ func main() {
 		position: unknown,
 		secDown:  17,
 		secUp:    20,
-		pinDown:  40,
-		pinUp:    38,
+		pinDown:  rpio.Pin(21),
+		pinUp:    rpio.Pin(20),
+	}
+
+	rpio.Open()
+	defer rpio.Close()
+	
+	for _, pin := range []rpio.Pin{sunscreenMain.pinDown, sunscreenMain.pinUp} {
+		pin.Output()
+		pin.High()
 	}
 
 	log.Println("--------Start of program--------")
