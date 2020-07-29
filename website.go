@@ -37,21 +37,20 @@ func modeHandler(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println(mode)
 	switch mode {
 	case autom:
-		io.WriteString(w, "Set mode to auto")
+		fmt.Println("Set mode to auto")
 		s1.Mode = autom
 	case manual + "/" + up:
-		io.WriteString(w, "Set mode to manual and move sunscreen up")
+		fmt.Println("Set mode to manual and move sunscreen up")
 		s1.Mode = manual
 		s1.Position = up
 	case manual + "/" + down:
-		io.WriteString(w, "Set mode to manual and move sunscreen down")
+		fmt.Println("Set mode to manual and move sunscreen down")
 		s1.Mode = manual
 		s1.Position = down
 	default:
-		io.WriteString(w, r.URL.Path)
-		io.WriteString(w, "\nTest\n")
-		io.WriteString(w, mode + "\n")
-		fmt.Println(mode == "autom")
+		fmt.Println(r.URL.Path)
+		fmt.Println("\nTest\n")
+		fmt.Println(mode + "\n")
 	}
 	http.Redirect(w, r, "/", http.StatusFound)
 }
