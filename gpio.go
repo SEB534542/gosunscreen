@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"github.com/stianeikeland/go-rpio"
 	"log"
+	"time"
 )
 
 // lowest measured value (neutral?): 150
@@ -12,31 +12,21 @@ import (
 var pin rpio.Pin = rpio.Pin(23)
 
 func main() {
-	/*
-	f, err := os.Create("go-log.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
-	*/
-	
 	fmt.Println("Testing GPIO")
 	rpio.Open()
 	defer rpio.Close()
-	
+
 	for {
 		getLight()
 		time.Sleep(time.Second)
 	}
-		
 }
 
 func getLight() {
 	lightValues := []int{}
-	for i:=0; i<10; i++ {
+	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, getLightValue())
-	} 
+	}
 	log.Println("Current light value is:", calcAverage(lightValues...))
 }
 
@@ -46,7 +36,7 @@ func getLightValue() int {
 	pin.Output()
 	pin.Low()
 	time.Sleep(100 * time.Millisecond)
-		
+
 	// Change the pin back to input
 	pin.Input()
 
