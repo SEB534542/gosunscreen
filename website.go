@@ -5,8 +5,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"time"
 	//"io"
-	//"time"
 )
 
 type sunscreen struct {
@@ -19,7 +19,12 @@ const manual string = "manual"
 const up string = "up"
 const down string = "down"
 
+var tpl *template.Template
 var s1 *sunscreen = &sunscreen{Mode: autom, Position: up}
+
+func init() {
+	tpl = template.Must(template.ParseGlob("templates/*"))
+}
 
 func main() {
 	http.HandleFunc("/", mainHandler)
@@ -29,8 +34,18 @@ func main() {
 }
 
 func mainHandler(w http.ResponseWriter, res *http.Request) {
-	t, _ := template.ParseFiles("index.gohtml")
-	t.Execute(w, s1)
+	data := struct {
+		*sunscreen
+		Time string
+	}{
+		s1,
+		time.Now().Format("_2 Jan 06 15:04:05"),
+	}
+
+	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func modeHandler(w http.ResponseWriter, res *http.Request) {
@@ -39,27 +54,25 @@ func modeHandler(w http.ResponseWriter, res *http.Request) {
 	switch mode {
 	case autom:
 		s1.Mode = autom
-		fmt.Println("New Mode:", s1.Mode)
-		fmt.Println("New Position:", s1.Position)
+		fmt.Println("New Mode:", s1.Mode, "// New Position:", s1.Position)
 	case manual + "/" + up:
 		s1.Mode = manual
 		s1.Position = up
-		fmt.Println("New Mode:", s1.Mode)
-		fmt.Println("New Position:", s1.Position)
+		fmt.Println("New Mode:", s1.Mode, "// New Position:", s1.Position)
 	case manual + "/" + down:
 		s1.Mode = manual
 		s1.Position = down
-		fmt.Println("New Mode:", s1.Mode)
-		fmt.Println("New Position:", s1.Position)
+		fmt.Println("New Mode:", s1.Mode, "// New Position:", s1.Position)
 	default:
-		fmt.Println(res.URL.Path)
-		fmt.Println("Current Mode:", s1.Mode)
-		fmt.Println("Current Position:", s1.Position)
+		fmt.Println("Unknown mode:", res.URL.Path)
+		fmt.Println("Current Mode:", s1.Mode, "// Current Position:", s1.Position)
 	}
 	http.Redirect(w, res, "/", http.StatusFound)
 }
 
 func configHandler(w http.ResponseWriter, res *http.Request) {
-	t, _ := template.ParseFiles("config.gohtml")
-	t.Execute(w, s1)
+	err := tpl.ExecuteTemplate(w, "config.gohtml", s1)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
