@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-// lowest measured neutral: 150
+// lowest measured value (neutral?): 150
 
 var pin rpio.Pin = rpio.Pin(23)
 
