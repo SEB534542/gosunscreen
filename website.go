@@ -19,6 +19,9 @@ const manual string = "manual"
 const up string = "up"
 const down string = "down"
 
+var sunrise = "10:00"
+var sunset = "18:45"
+
 var tpl *template.Template
 var s1 *sunscreen = &sunscreen{Mode: autom, Position: up}
 
@@ -33,7 +36,7 @@ func main() {
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }
 
-func mainHandler(w http.ResponseWriter, res *http.Request) {
+func mainHandler(w http.ResponseWriter, req *http.Request) {
 	data := struct {
 		*sunscreen
 		Time string
@@ -48,8 +51,8 @@ func mainHandler(w http.ResponseWriter, res *http.Request) {
 	}
 }
 
-func modeHandler(w http.ResponseWriter, res *http.Request) {
-	mode := res.URL.Path[len("/mode/"):]
+func modeHandler(w http.ResponseWriter, req *http.Request) {
+	mode := req.URL.Path[len("/mode/"):]
 	// fmt.Println(mode)
 	switch mode {
 	case autom:
@@ -64,14 +67,21 @@ func modeHandler(w http.ResponseWriter, res *http.Request) {
 		s1.Position = down
 		fmt.Println("New Mode:", s1.Mode, "// New Position:", s1.Position)
 	default:
-		fmt.Println("Unknown mode:", res.URL.Path)
+		fmt.Println("Unknown mode:", req.URL.Path)
 		fmt.Println("Current Mode:", s1.Mode, "// Current Position:", s1.Position)
 	}
-	http.Redirect(w, res, "/", http.StatusFound)
+	http.Redirect(w, req, "/", http.StatusFound)
 }
 
-func configHandler(w http.ResponseWriter, res *http.Request) {
-	err := tpl.ExecuteTemplate(w, "config.gohtml", s1)
+func configHandler(w http.ResponseWriter, req *http.Request) {	
+	data := struct {
+		Sunrise string
+		Sunset string
+	}{
+		sunrise,
+		sunset,
+	}
+	err := tpl.ExecuteTemplate(w, "config.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
 	}
