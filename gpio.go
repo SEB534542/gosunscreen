@@ -5,6 +5,7 @@ import (
 	"github.com/stianeikeland/go-rpio"
 	"log"
 	"time"
+	"os"
 )
 
 // lowest measured value (neutral?): 150
@@ -12,6 +13,13 @@ import (
 var pin rpio.Pin = rpio.Pin(23)
 
 func main() {
+	f, err := os.Create("go-log.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+	
 	fmt.Println("Testing GPIO")
 	rpio.Open()
 	defer rpio.Close()

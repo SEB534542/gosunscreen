@@ -33,7 +33,7 @@ func main() {
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
