@@ -1,11 +1,11 @@
-package website
+package main
 
 import (
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"io"
+	//"io"
 	//"time"
 )
 
@@ -16,41 +16,50 @@ type sunscreen struct {
 
 const autom string = "autom"
 const manual string = "manual"
-const up string = "Up"
-const down string = "Down"
+const up string = "up"
+const down string = "down"
 
 var s1 *sunscreen = &sunscreen{Mode: autom, Position: up}
 
 func main() {
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
+	http.HandleFunc("/config/", configHandler)
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }
 
-func mainHandler(w http.ResponseWriter, r *http.Request) {
+func mainHandler(w http.ResponseWriter, res *http.Request) {
 	t, _ := template.ParseFiles("index.gohtml")
 	t.Execute(w, s1)
 }
 
-func modeHandler(w http.ResponseWriter, r *http.Request) {
-	mode := r.URL.Path[len("/mode/"):]
+func modeHandler(w http.ResponseWriter, res *http.Request) {
+	mode := res.URL.Path[len("/mode/"):]
 	// fmt.Println(mode)
 	switch mode {
 	case autom:
-		fmt.Println("Set mode to auto")
 		s1.Mode = autom
+		fmt.Println("New Mode:", s1.Mode)
+		fmt.Println("New Position:", s1.Position)
 	case manual + "/" + up:
-		fmt.Println("Set mode to manual and move sunscreen up")
 		s1.Mode = manual
 		s1.Position = up
+		fmt.Println("New Mode:", s1.Mode)
+		fmt.Println("New Position:", s1.Position)
 	case manual + "/" + down:
-		fmt.Println("Set mode to manual and move sunscreen down")
 		s1.Mode = manual
 		s1.Position = down
+		fmt.Println("New Mode:", s1.Mode)
+		fmt.Println("New Position:", s1.Position)
 	default:
-		fmt.Println(r.URL.Path)
-		fmt.Println("\nTest\n")
-		fmt.Println(mode + "\n")
+		fmt.Println(res.URL.Path)
+		fmt.Println("Current Mode:", s1.Mode)
+		fmt.Println("Current Position:", s1.Position)
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, res, "/", http.StatusFound)
+}
+
+func configHandler(w http.ResponseWriter, res *http.Request) {
+	t, _ := template.ParseFiles("config.gohtml")
+	t.Execute(w, s1)
 }
