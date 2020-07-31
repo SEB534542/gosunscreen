@@ -286,22 +286,31 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		log.Fatalln(err)
 	}
 	if len(req.PostForm) != 0 {
-		config.Sunrise = StoTime(req.PostForm["Sunrise"][0], 0)
-		config.Sunset = StoTime(req.PostForm["Sunset"][0], 0)
-		config.SunsetThreshold, _ = strconv.Atoi(req.PostForm["SunsetThreshold"][0])
-		config.Interval, _ = strconv.Atoi(req.PostForm["Interval"][0])
-		config.LightGoodValue, _ = strconv.Atoi(req.PostForm["LightGoodValue"][0])
-		config.LightGoodThreshold, _ = strconv.Atoi(req.PostForm["LightGoodThreshold"][0])
-		config.LightNeutralValue, _ = strconv.Atoi(req.PostForm["LightNeutralValue"][0])
-		config.LightNeutralThreshold, _ = strconv.Atoi(req.PostForm["LightNeutralThreshold"][0])
-		config.LightBadValue, _ = strconv.Atoi(req.PostForm["LightBadValue"][0])
-		config.LightBadThreshold, _ = strconv.Atoi(req.PostForm["LightBadThreshold"][0])
-		config.AllowedOutliers, _ = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
-		//TODO: error handling if format is not correct!!!
+		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
+		if err != nil {log.Fatalln(err)}
+		config.Sunset, err = StoTime(req.PostForm["Sunset"][0], 0)
+		if err != nil {log.Fatalln(err)}
+		config.SunsetThreshold, err = strconv.Atoi(req.PostForm["SunsetThreshold"][0])
+		if err != nil {log.Fatalln(err)}
+		config.Interval, err = strconv.Atoi(req.PostForm["Interval"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightGoodValue, err = strconv.Atoi(req.PostForm["LightGoodValue"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightGoodThreshold, err = strconv.Atoi(req.PostForm["LightGoodThreshold"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightNeutralValue, err = strconv.Atoi(req.PostForm["LightNeutralValue"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightNeutralThreshold, err = strconv.Atoi(req.PostForm["LightNeutralThreshold"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightBadValue, err = strconv.Atoi(req.PostForm["LightBadValue"][0])
+		if err != nil {log.Fatalln(err)}
+		config.LightBadThreshold, err = strconv.Atoi(req.PostForm["LightBadThreshold"][0])
+		if err != nil {log.Fatalln(err)}
+		config.AllowedOutliers, err = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
+		if err != nil {log.Fatalln(err)}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
-
 	
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
 	if err != nil {
@@ -310,20 +319,20 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
-func StoTime(t string, days int) time.Time {
+func StoTime(t string, days int) (time.Time, error) {
 	timeNow := time.Now()
 
 	timeHour, err := strconv.Atoi(t[:2])
 	if err != nil {
-		log.Panicf("Time %v is not correctly formatted. Please unsure time is written as hh:mm. Error: %v", t, err)
+		return time.Time{}, err
 	}
 
 	timeMinute, err := strconv.Atoi(t[3:])
 	if err != nil {
-		log.Panicf("Time %s is not correctly formatted. Please unsure time is written as hh:mm", t)
+		return time.Time{}, err
 	}
 
-	return time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day()+days, int(timeHour), int(timeMinute), 0, 0, time.Local)
+	return time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day()+days, int(timeHour), int(timeMinute), 0, 0, time.Local), nil
 }
 
 // MaxIntSlice receives variadic parameter of integers and return the highest integer
