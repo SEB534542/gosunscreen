@@ -37,8 +37,8 @@ var mu sync.Mutex
 
 // A Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	mode     string // Mode of Sunscreen auto or manual
-	position string // Current position of Sunscreen
+	Mode     string // Mode of Sunscreen auto or manual
+	Position string // Current position of Sunscreen
 	secDown  int    // Seconds to move Sunscreen down
 	secUp    int    // Seconds to move Sunscreen up
 	pinDown  int    // GPIO pin for moving Sunscreen down
@@ -51,24 +51,24 @@ type lightSensor struct {
 	data     []int // collected light values
 }
 
-// Move moves the suncreen up or down based on the Sunscreen.position. It updates the position accordingly.
+// Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
-	if s.position != up {
-		log.Printf("Sunscreen position is %v, moving Sunscreen up", s.position)
+	if s.Position != up {
+		log.Printf("Sunscreen position is %v, moving Sunscreen up", s.Position)
 		// TODO: move Sunscreen up
-		// TODO: lock s.position
-		s.position = up
+		// TODO: lock s.Position
+		s.Position = up
 	} else {
-		log.Printf("Sunscreen position is %v, moving Sunscreen down", s.position)
+		log.Printf("Sunscreen position is %v, moving Sunscreen down", s.Position)
 		// TODO: move Sunscreen down
-		// TODO: lock s.position
-		s.position = down
+		// TODO: lock s.Position
+		s.Position = down
 	}
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
 func (s *Sunscreen) Up() {
-	if s.position != up {
+	if s.Position != up {
 		s.Move()
 	}
 }
@@ -76,9 +76,9 @@ func (s *Sunscreen) Up() {
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
 func (s *Sunscreen) reviewPosition(lightData []int) {
 	counter := 0
-	switch s.position {
+	switch s.Position {
 	case up:
-		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.position)
+		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
 		for _, v := range lightData[:(config.LigthGoodThreshold + config.AllowedOutliers)] {
 			if v <= config.LightGoodValue {
 				counter++
@@ -89,7 +89,7 @@ func (s *Sunscreen) reviewPosition(lightData []int) {
 			return
 		}
 	case down:
-		log.Printf("Sunscreen is %v. Check if it should go up\n", s.position)
+		log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
 
 		for _, v := range lightData[:(config.LigthNeutralThreshold + config.AllowedOutliers)] {
 			if v >= config.LightNeutralValue {
@@ -150,8 +150,8 @@ func StoTime(t string, days int) time.Time {
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
 		switch {
-		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.position == up:
-			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset\n", config.SunsetThreshold, s.position)
+		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
+			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset\n", config.SunsetThreshold, s.Position)
 			// TODO: Snooze until Sunset
 		case config.Sunset.Sub(time.Now()) <= 0:
 			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset)
@@ -179,8 +179,8 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		mu.Unlock()
 		log.Println("Completed cycle, sleeping...")
 		for i := 0; i <= config.Interval; i++ {
-			//TODO abort function if s.mode != auto
-			if s.mode != auto {
+			//TODO abort function if s.Mode != auto
+			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
 				return
 			}
@@ -227,8 +227,8 @@ func main() {
 	}
 
 	sunscreenMain := &Sunscreen{
-		mode:     auto,
-		position: unknown,
+		Mode:     auto,
+		Position: unknown,
 		secDown:  17,
 		secUp:    20,
 		pinDown:  40,
