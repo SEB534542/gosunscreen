@@ -270,14 +270,20 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 	// fmt.Println(mode)
 	switch mode {
 	case auto:
+		if s1.Mode == manual {
+			go s1.autoSunscreen(ls1)
+		}
 		s1.Mode = auto
 		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
 	case manual + "/" + up:
 		s1.Mode = manual
+		//TODO: move instead of changing position(!)
+		//Put in sleep to let auto routine stop and put in controls once screen is moving
 		s1.Position = up
 		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
 	case manual + "/" + down:
 		s1.Mode = manual
+		//TODO: move instead of changing position(!)
 		s1.Position = down
 		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
 	default:
