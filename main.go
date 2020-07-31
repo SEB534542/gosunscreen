@@ -3,8 +3,10 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -19,11 +21,11 @@ var config = struct {
 	SunsetThreshold       int       // minutes before sunset that Sunscreen no longer should go down
 	Interval              int       // interval for checking current light in seconds
 	LightGoodValue        int       // max measured light value that counts as "good weather"
-	LigthGoodThreshold    int       // number of times light should be below lightGoodValue
+	LightGoodThreshold    int       // number of times light should be below lightGoodValue
 	LightNeutralValue     int       // max measured light value that counts as "neutral weather"
-	LigthNeutralThreshold int       // number of times light should be above lightNeutralValue
+	LightNeutralThreshold int       // number of times light should be above lightNeutralValue
 	LightBadValue         int       // max measured light value that counts as "bad weather"
-	LigthBadThreshold     int       // number of times light should be above lightBadValue
+	LightBadThreshold     int       // number of times light should be above lightBadValue
 	AllowedOutliers       int       // number of outliers accepted in the measurement
 }{}
 
@@ -32,8 +34,32 @@ const down string = "down"
 const unknown string = "unknown"
 const auto string = "auto"
 const manual string = "manual"
+const configFile string = "config.json"
 
+var tpl *template.Template
 var mu sync.Mutex
+
+var fm = template.FuncMap{
+	"fdateHM": hourMinute,
+}
+
+var ls1 = &lightSensor{
+	pinLight: 16,
+	data:     []int{},
+}
+
+var s1 = &Sunscreen{
+	Mode:     auto,
+	Position: unknown,
+	secDown:  17,
+	secUp:    20,
+	pinDown:  40,
+	pinUp:    38,
+}
+
+func hourMinute (t time.Time) string {
+	return t.Format("15:04")
+}
 
 // A Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
@@ -79,34 +105,34 @@ func (s *Sunscreen) reviewPosition(lightData []int) {
 	switch s.Position {
 	case up:
 		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
-		for _, v := range lightData[:(config.LigthGoodThreshold + config.AllowedOutliers)] {
+		for _, v := range lightData[:(config.LightGoodThreshold + config.AllowedOutliers)] {
 			if v <= config.LightGoodValue {
 				counter++
 			}
 		}
-		if counter >= config.LigthGoodThreshold {
+		if counter >= config.LightGoodThreshold {
 			s.Move()
 			return
 		}
 	case down:
 		log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
 
-		for _, v := range lightData[:(config.LigthNeutralThreshold + config.AllowedOutliers)] {
+		for _, v := range lightData[:(config.LightNeutralThreshold + config.AllowedOutliers)] {
 			if v >= config.LightNeutralValue {
 				counter++
 			}
 		}
-		if counter >= config.LigthNeutralThreshold {
+		if counter >= config.LightNeutralThreshold {
 			s.Move()
 			return
 		}
 
-		for _, v := range lightData[:(config.LigthBadThreshold + config.AllowedOutliers)] {
+		for _, v := range lightData[:(config.LightBadThreshold + config.AllowedOutliers)] {
 			if v >= config.LightBadValue {
 				counter++
 			}
 		}
-		if counter >= config.LigthBadThreshold {
+		if counter >= config.LightBadThreshold {
 			s.Move()
 			return
 		}
@@ -117,34 +143,6 @@ func (s *Sunscreen) reviewPosition(lightData []int) {
 func (ls *lightSensor) GetCurrentLight() []int {
 	// TODO: measure light
 	return []int{5}
-}
-
-// MaxIntSlice receives variadic parameter of integers and return the highest integer
-func MaxIntSlice(xi ...int) int {
-	var max int
-	for i, v := range xi {
-		if i == 0 || v < max {
-			max = v
-		}
-	}
-	return max
-}
-
-// StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
-func StoTime(t string, days int) time.Time {
-	timeNow := time.Now()
-
-	timeHour, err := strconv.Atoi(t[:2])
-	if err != nil {
-		log.Panicf("Time %v is not correctly formatted. Please unsure time is written as hh:mm. Error: %v", t, err)
-	}
-
-	timeMinute, err := strconv.Atoi(t[3:])
-	if err != nil {
-		log.Panicf("Time %s is not correctly formatted. Please unsure time is written as hh:mm", t)
-	}
-
-	return time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day()+days, int(timeHour), int(timeMinute), 0, 0, time.Local)
 }
 
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
@@ -169,11 +167,10 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			mu.Unlock()
 			go ls.monitorLight()
 		}
-		maxLen := MaxIntSlice(config.LigthGoodThreshold, config.LigthBadThreshold, config.LigthNeutralThreshold) + config.AllowedOutliers
+		maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
 		mu.Lock()
 		if len(ls.data) > maxLen {
 			ls.data = ls.data[:maxLen]
-			log.Println(len(ls.data), ls.data)
 			s.reviewPosition(ls.data)
 		}
 		mu.Unlock()
@@ -205,8 +202,11 @@ func (ls *lightSensor) monitorLight() {
 }
 
 func init() {
-	log.Println("Loading config...")
-	data, err := ioutil.ReadFile("config.json")
+	//Loading gohtml templates
+	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("templates/*"))
+
+	//Loading config
+	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -221,32 +221,114 @@ func init() {
 }
 
 func main() {
-	ls1 := &lightSensor{
-		pinLight: 16,
-		data:     []int{},
-	}
-
-	sunscreenMain := &Sunscreen{
-		Mode:     auto,
-		Position: unknown,
-		secDown:  17,
-		secUp:    20,
-		pinDown:  40,
-		pinUp:    38,
-	}
-
 	log.Println("--------Start of program--------")
-	go sunscreenMain.Move()
+	go s1.Move()
 	defer func() {
 		log.Println("Closing down...")
-		sunscreenMain.Up()
+		s1.Up()
 		// TODO: close down ls?
 	}()
 	go ls1.monitorLight()
-	go sunscreenMain.autoSunscreen(ls1)
-	for {
+	go s1.autoSunscreen(ls1)
 
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/mode/", modeHandler)
+	http.HandleFunc("/config/", configHandler)
+	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
+}
+
+func mainHandler(w http.ResponseWriter, req *http.Request) {
+	data := struct {
+		*Sunscreen
+		Time string
+	}{
+		s1,
+		time.Now().Format("_2 Jan 06 15:04:05"),
 	}
+
+	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func modeHandler(w http.ResponseWriter, req *http.Request) {
+	mode := req.URL.Path[len("/mode/"):]
+	// fmt.Println(mode)
+	switch mode {
+	case auto:
+		s1.Mode = auto
+		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
+	case manual + "/" + up:
+		s1.Mode = manual
+		s1.Position = up
+		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
+	case manual + "/" + down:
+		s1.Mode = manual
+		s1.Position = down
+		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
+	default:
+		log.Println("Unknown mode:", req.URL.Path)
+		log.Println("Current Mode:", s1.Mode, "// Current Position:", s1.Position)
+	}
+	http.Redirect(w, req, "/", http.StatusFound)
+}
+
+func configHandler(w http.ResponseWriter, req *http.Request) {
+	err := req.ParseForm()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if len(req.PostForm) != 0 {
+		config.Sunrise = StoTime(req.PostForm["Sunrise"][0], 0)
+		config.Sunset = StoTime(req.PostForm["Sunset"][0], 0)
+		config.SunsetThreshold, _ = strconv.Atoi(req.PostForm["SunsetThreshold"][0])
+		config.Interval, _ = strconv.Atoi(req.PostForm["Interval"][0])
+		config.LightGoodValue, _ = strconv.Atoi(req.PostForm["LightGoodValue"][0])
+		config.LightGoodThreshold, _ = strconv.Atoi(req.PostForm["LightGoodThreshold"][0])
+		config.LightNeutralValue, _ = strconv.Atoi(req.PostForm["LightNeutralValue"][0])
+		config.LightNeutralThreshold, _ = strconv.Atoi(req.PostForm["LightNeutralThreshold"][0])
+		config.LightBadValue, _ = strconv.Atoi(req.PostForm["LightBadValue"][0])
+		config.LightBadThreshold, _ = strconv.Atoi(req.PostForm["LightBadThreshold"][0])
+		config.AllowedOutliers, _ = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
+		//TODO: error handling if format is not correct!!!
+		SaveToJson(config, configFile)
+		log.Println("Updated variables")
+	}
+
+	
+	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+// StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
+func StoTime(t string, days int) time.Time {
+	timeNow := time.Now()
+
+	timeHour, err := strconv.Atoi(t[:2])
+	if err != nil {
+		log.Panicf("Time %v is not correctly formatted. Please unsure time is written as hh:mm. Error: %v", t, err)
+	}
+
+	timeMinute, err := strconv.Atoi(t[3:])
+	if err != nil {
+		log.Panicf("Time %s is not correctly formatted. Please unsure time is written as hh:mm", t)
+	}
+
+	return time.Date(timeNow.Year(), timeNow.Month(), timeNow.Day()+days, int(timeHour), int(timeMinute), 0, 0, time.Local)
+}
+
+// MaxIntSlice receives variadic parameter of integers and return the highest integer
+func MaxIntSlice(xi ...int) int {
+	var max int
+	for i, v := range xi {
+		if i == 0 || v > max {
+			max = v
+		}
+	}
+	return max
 }
 
 // SaveToJson takes an interface and stores it into the filename
