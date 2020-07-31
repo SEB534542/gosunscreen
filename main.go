@@ -130,7 +130,7 @@ func MaxIntSlice(xi ...int) int {
 	return max
 }
 
-// StoTime receive string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
+// StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
 func StoTime(t string, days int) time.Time {
 	timeNow := time.Now()
 
@@ -205,7 +205,7 @@ func (ls *lightSensor) monitorLight() {
 }
 
 func init() {
-	log.Println("Load config...")
+	log.Println("Loading config...")
 	data, err := ioutil.ReadFile("config.json")
 	if err != nil {
 		log.Fatal(err)
