@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"github.com/stianeikeland/go-rpio"
 )
 
 // https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
@@ -35,34 +36,40 @@ const manual string = "manual"
 
 var mu sync.Mutex
 
-// A Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
-type Sunscreen struct {
-	Mode     string // Mode of Sunscreen auto or manual
-	Position string // Current position of Sunscreen
-	secDown  int    // Seconds to move Sunscreen down
-	secUp    int    // Seconds to move Sunscreen up
-	pinDown  int    // GPIO pin for moving Sunscreen down
-	pinUp    int    // GPIO pin for moving Sunscreen up
+// A Sunscreen represents a physical sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
+type sunscreen struct {
+	Mode     string // Mode of sunscreen auto or manual
+	Position string // Current position of sunscreen
+	secDown  int    // Seconds to move sunscreen down
+	secUp    int    // Seconds to move sunscreen up
+	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
 }
 
 // A LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight int   // pin for retrieving light value
+	pinLight rpio.Pin   // pin for retrieving light value
 	data     []int // collected light values
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
 	if s.Position != up {
-		log.Printf("Sunscreen position is %v, moving Sunscreen up", s.Position)
-		// TODO: move Sunscreen up
-		// TODO: lock s.Position
+		log.Printf("Sunscreen position is %v, moving sunscreen up", s.Position)
+		s.pinUp.Low()
+		time.Sleep(time.Second * s.secUp)
+		s.pinUp.High()
+		mu.Lock()
 		s.Position = up
+		mu.Unlock()
 	} else {
-		log.Printf("Sunscreen position is %v, moving Sunscreen down", s.Position)
-		// TODO: move Sunscreen down
-		// TODO: lock s.Position
+		log.Printf("Sunscreen position is %v, moving sunscreen down", s.Position)
+		s.pinDown.Low()
+		time.Sleep(time.Second * s.secDown)
+		s.pinDown.High()
+		mu.Lock()
 		s.Position = down
+		mu.Unlock()
 	}
 }
 
@@ -222,7 +229,7 @@ func init() {
 
 func main() {
 	ls1 := &lightSensor{
-		pinLight: 16,
+		pinLight: rpio.Pin(23),
 		data:     []int{},
 	}
 
@@ -231,8 +238,16 @@ func main() {
 		Position: unknown,
 		secDown:  17,
 		secUp:    20,
-		pinDown:  40,
-		pinUp:    38,
+		pinDown:  rpio.Pin(21),
+		pinUp:    rpio.Pin(20),
+	}
+
+	rpio.Open()
+	defer rpio.Close()
+	
+	for _, pin := range []rpio.Pin{sunscreenMain.pinDown, sunscreenMain.pinUp} {
+		pin.Output()
+		pin.High()
 	}
 
 	log.Println("--------Start of program--------")
