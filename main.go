@@ -205,11 +205,10 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 
 func (ls *lightSensor) monitorLight() {
 	for {
-		//TODO: rewrite that if within sunrise - sunset (using Before or After): add data, else ls.data = []int{}
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			mu.Lock()
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
-			//ensure ls.data doesnt get too long
+			// Ensure ls.data doesn't get too long
 			maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
 			if len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
