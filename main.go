@@ -81,19 +81,20 @@ type lightSensor struct {
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
 	if s.Position != up {
-		log.Printf("Sunscreen position is %v, moving sunscreen up", s.Position)
+		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
+		mu.Lock()
 		s.pinUp.Low()
 		time.Sleep(time.Second * s.secUp)
 		s.pinUp.High()
-		mu.Lock()
 		s.Position = up
 		mu.Unlock()
+		// TODO: test if possible you can move it at the same time(!)
 	} else {
-		log.Printf("Sunscreen position is %v, moving sunscreen down", s.Position)
+		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
+		mu.Lock()
 		s.pinDown.Low()
 		time.Sleep(time.Second * s.secDown)
 		s.pinDown.High()
-		mu.Lock()
 		s.Position = down
 		mu.Unlock()
 	}
