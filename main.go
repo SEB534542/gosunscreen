@@ -104,8 +104,6 @@ func (s *Sunscreen) Move() {
 func (s *Sunscreen) Up() {
 	if s.Position != up {
 		s.Move()
-	} else {
-		log.Println("Sunscreen is already up...")
 	}
 }
 
@@ -113,8 +111,6 @@ func (s *Sunscreen) Up() {
 func (s *Sunscreen) Down() {
 	if s.Position != down {
 		s.Move()
-	} else {
-		log.Println("Sunscreen is already down...")
 	}
 }
 
@@ -175,37 +171,27 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 					return
 				}
 				time.Sleep(time.Second)
-			}			
+			}
 			fallthrough
-		case config.Sunset.Sub(time.Now()) <= 0:
+		case time.Now().After(config.Sunset):
 			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
 			s.Up()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 			fallthrough
-		case config.Sunrise.Sub(time.Now()) > 0:
+		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
-			s.Up()			
+			s.Up()
 			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
 				}
 				time.Sleep(time.Second)
-			}			
+			}
 			log.Printf("Sun is up")
-			mu.Lock()
-			ls.data = []int{}
-			mu.Unlock()
-			go ls.monitorLight()
 		}
-		maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
-		mu.Lock()
-		if len(ls.data) > maxLen {
-			ls.data = ls.data[:maxLen]
-			s.reviewPosition(ls.data)
-		}
-		mu.Unlock()
+		s.reviewPosition(ls.data)
 		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
 		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
@@ -219,12 +205,19 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 
 func (ls *lightSensor) monitorLight() {
 	for {
-		mu.Lock()
-		ls.data = append(ls.GetCurrentLight(), ls.data...)
-		mu.Unlock()
-		if config.Sunset.Sub(time.Now()) <= 0 {
-			log.Printf("Sun is down (%v), shutting down light", config.Sunset)
-			return
+		//TODO: rewrite that if within sunrise - sunset (using Before or After): add data, else ls.data = []int{}
+		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
+			mu.Lock()
+			ls.data = append(ls.GetCurrentLight(), ls.data...)
+			//ensure ls.data doesnt get too long
+			maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
+			if len(ls.data) > maxLen {
+				ls.data = ls.data[:maxLen]
+			}
+			mu.Unlock()
+		} else {
+			// Sun is not up
+			ls.data = []int{}
 		}
 		for i := 0; i < config.Interval; i++ {
 			time.Sleep(time.Second)
@@ -296,7 +289,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 		if s1.Mode == manual {
 			go s1.autoSunscreen(ls1)
 			s1.Mode = auto
-			log.Printf("Set mode to auto (%v)\n", s1.Mode) 
+			log.Printf("Set mode to auto (%v)\n", s1.Mode)
 		} else {
 			log.Printf("Mode is already auto (%v)\n", s1.Mode)
 		}
