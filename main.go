@@ -167,8 +167,14 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
-			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset\n", config.SunsetThreshold, s.Position)
-			time.Sleep(config.Sunset.Sub(time.Now()))
+			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
+			for i := 0; float64(i) <= config.Sunset.Sub(time.Now()).Seconds(); i++ {
+				if s.Mode != auto {
+					log.Println("Mode is no longer auto, closing auto func")
+					return
+				}
+				time.Sleep(time.Second)
+			}			
 			fallthrough
 		case config.Sunset.Sub(time.Now()) <= 0:
 			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
@@ -177,9 +183,15 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 			fallthrough
 		case config.Sunrise.Sub(time.Now()) > 0:
-			log.Printf("Sun is not yet up, snoozing until %v...", config.Sunrise.Format("2 Jan 15:04 MST"))
-			s.Up()
-			time.Sleep(config.Sunrise.Sub(time.Now()))
+			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
+			s.Up()			
+			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
+				if s.Mode != auto {
+					log.Println("Mode is no longer auto, closing auto func")
+					return
+				}
+				time.Sleep(time.Second)
+			}			
 			log.Printf("Sun is up")
 			mu.Lock()
 			ls.data = []int{}
@@ -193,8 +205,8 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			s.reviewPosition(ls.data)
 		}
 		mu.Unlock()
-		log.Println("Completed cycle, sleeping...")
-		for i := 0; i <= config.Interval; i++ {
+		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
+		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
 				return

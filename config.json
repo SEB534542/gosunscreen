@@ -1,1 +1,1 @@
-{"Sunrise":"2020-08-01T08:23:00+02:00","Sunset":"2020-08-01T21:00:00+02:00","SunsetThreshold":70,"Interval":1,"LightGoodValue":9,"LightGoodThreshold":15,"LightNeutralValue":9,"LightNeutralThreshold":15,"LightBadValue":9,"LightBadThreshold":15,"AllowedOutliers":2}
+{"Sunrise":"2020-08-01T08:23:00+02:00","Sunset":"2020-08-01T11:00:00+02:00","SunsetThreshold":70,"Interval":2,"LightGoodValue":9,"LightGoodThreshold":15,"LightNeutralValue":9,"LightNeutralThreshold":15,"LightBadValue":9,"LightBadThreshold":15,"AllowedOutliers":2}
