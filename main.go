@@ -57,7 +57,7 @@ var s1 = &Sunscreen{
 	pinUp:    38,
 }
 
-func hourMinute (t time.Time) string {
+func hourMinute(t time.Time) string {
 	return t.Format("15:04")
 }
 
@@ -96,6 +96,17 @@ func (s *Sunscreen) Move() {
 func (s *Sunscreen) Up() {
 	if s.Position != up {
 		s.Move()
+	} else {
+		log.Println("Sunscreen is already up...")
+	}
+}
+
+// Down checks if s suncreen position is down. If not, it moves s suncreen down through method move().
+func (s *Sunscreen) Down() {
+	if s.Position != down {
+		s.Move()
+	} else {
+		log.Println("Sunscreen is already down...")
 	}
 }
 
@@ -150,15 +161,16 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset\n", config.SunsetThreshold, s.Position)
-			// TODO: Snooze until Sunset
+			time.Sleep(config.Sunset.Sub(time.Now()))
+			fallthrough
 		case config.Sunset.Sub(time.Now()) <= 0:
-			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset)
+			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
 			s.Up()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 			fallthrough
 		case config.Sunrise.Sub(time.Now()) > 0:
-			log.Printf("Sun is not yet up, snoozing until %v...", config.Sunrise)
+			log.Printf("Sun is not yet up, snoozing until %v...", config.Sunrise.Format("2 Jan 15:04 MST"))
 			s.Up()
 			time.Sleep(config.Sunrise.Sub(time.Now()))
 			log.Printf("Sun is up")
@@ -176,7 +188,6 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		mu.Unlock()
 		log.Println("Completed cycle, sleeping...")
 		for i := 0; i <= config.Interval; i++ {
-			//TODO abort function if s.Mode != auto
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
 				return
@@ -214,19 +225,19 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Resetting Sunrise and Sunset to today...")
+
+	//Resetting Sunrise and Sunset to today
 	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
 	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
-	log.Println(config.Sunrise, config.Sunset)
 }
 
 func main() {
 	log.Println("--------Start of program--------")
+	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	go s1.Move()
 	defer func() {
 		log.Println("Closing down...")
 		s1.Up()
-		// TODO: close down ls?
 	}()
 	go ls1.monitorLight()
 	go s1.autoSunscreen(ls1)
@@ -254,29 +265,25 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 
 func modeHandler(w http.ResponseWriter, req *http.Request) {
 	mode := req.URL.Path[len("/mode/"):]
-	// fmt.Println(mode)
 	switch mode {
 	case auto:
 		if s1.Mode == manual {
 			go s1.autoSunscreen(ls1)
+			s1.Mode = auto
+			log.Printf("Set mode to auto (%v)\n", s1.Mode) 
+		} else {
+			log.Printf("Mode is already auto (%v)\n", s1.Mode)
 		}
-		s1.Mode = auto
-		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
 	case manual + "/" + up:
 		s1.Mode = manual
-		//TODO: move instead of changing position(!)
-		//Put in sleep to let auto routine stop and put in controls once screen is moving
-		s1.Position = up
-		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
+		s1.Up()
 	case manual + "/" + down:
 		s1.Mode = manual
-		//TODO: move instead of changing position(!)
-		s1.Position = down
-		log.Println("Updated Mode:", s1.Mode, "and Position:", s1.Position)
+		s1.Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
-		log.Println("Current Mode:", s1.Mode, "// Current Position:", s1.Position)
 	}
+	log.Println("Mode=", s1.Mode, "and Position=", s1.Position)
 	http.Redirect(w, req, "/", http.StatusFound)
 }
 
@@ -287,31 +294,53 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	if len(req.PostForm) != 0 {
 		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.Sunset, err = StoTime(req.PostForm["Sunset"][0], 0)
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.SunsetThreshold, err = strconv.Atoi(req.PostForm["SunsetThreshold"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.Interval, err = strconv.Atoi(req.PostForm["Interval"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightGoodValue, err = strconv.Atoi(req.PostForm["LightGoodValue"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightGoodThreshold, err = strconv.Atoi(req.PostForm["LightGoodThreshold"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightNeutralValue, err = strconv.Atoi(req.PostForm["LightNeutralValue"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightNeutralThreshold, err = strconv.Atoi(req.PostForm["LightNeutralThreshold"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightBadValue, err = strconv.Atoi(req.PostForm["LightBadValue"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.LightBadThreshold, err = strconv.Atoi(req.PostForm["LightBadThreshold"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.AllowedOutliers, err = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
-		if err != nil {log.Fatalln(err)}
+		if err != nil {
+			log.Fatalln(err)
+		}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
-	
+
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
 	if err != nil {
 		log.Fatalln(err)
