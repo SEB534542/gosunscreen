@@ -159,6 +159,7 @@ func (ls *lightSensor) GetCurrentLight() []int {
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
 		switch {
+		// TODO: replace sub with after/before in all cases
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
 			for i := 0; float64(i) <= config.Sunset.Sub(time.Now()).Seconds(); i++ {
@@ -211,6 +212,7 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 
 func (ls *lightSensor) monitorLight() {
 	for {
+		//TODO: rewrite that if within sunrise - sunset (using Before or After): add data, else ls.data = []int{}
 		mu.Lock()
 		ls.data = append(ls.GetCurrentLight(), ls.data...)
 		mu.Unlock()
