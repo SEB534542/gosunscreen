@@ -183,7 +183,12 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			}
 			log.Printf("Sun is up")
 		}
-		s.reviewPosition(ls.data)
+		//ensure ls.data doesnt get too long
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen { 
+				mu.Lock()
+				s.reviewPosition(ls.data)
+				mu.Unlock()
+			}
 		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
 		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
@@ -202,14 +207,15 @@ func (ls *lightSensor) monitorLight() {
 			mu.Lock()
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
 			//ensure ls.data doesnt get too long
-			maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
-			if len(ls.data) > maxLen {
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen { 
 				ls.data = ls.data[:maxLen]
 			}
 			mu.Unlock()
 		} else {
 			// Sun is not up
+			mu.Lock()
 			ls.data = []int{}
+			mu.Unlock()
 		}
 		for i := 0; i < config.Interval; i++ {
 			time.Sleep(time.Second)
