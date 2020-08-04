@@ -107,7 +107,7 @@ func (s *Sunscreen) Down() {
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
-func (s *Sunscreen) reviewPosition(lightData []int) {
+func (s *Sunscreen) evalPosition(lightData []int) {
 	counter := 0
 	switch s.Position {
 	case up:
@@ -157,14 +157,14 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
-			for i := 0; float64(i) <= config.Sunset.Sub(time.Now()).Seconds(); i++ {
+			for config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
 				}
 				time.Sleep(time.Second)
 			}
-			fallthrough
+			continue
 		case time.Now().After(config.Sunset):
 			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
 			s.Up()
@@ -183,10 +183,10 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			}
 			log.Printf("Sun is up")
 		}
-		//ensure ls.data doesnt get too long
-			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen { 
+		//if there is enough light gathered in ls.data, evaluate position
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen { 
 				mu.Lock()
-				s.reviewPosition(ls.data)
+				s.evalPosition(ls.data)
 				mu.Unlock()
 			}
 		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
@@ -304,6 +304,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		log.Fatalln(err)
 	}
 	if len(req.PostForm) != 0 {
+		mu.Lock()
 		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
 		if err != nil {
 			log.Fatalln(err)
@@ -349,6 +350,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			log.Fatalln(err)
 		}
 		SaveToJson(config, configFile)
+		mu.Unlock()
 		log.Println("Updated variables")
 	}
 
