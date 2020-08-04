@@ -262,16 +262,19 @@ func main() {
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
+	mu.Lock()
 	data := struct {
 		*Sunscreen
 		Time        string
 		RefreshRate int
+		Light []int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
+		ls1.data[MaxIntSlice(0, len(ls1.data)-10):len(ls1.data)],
 	}
-
+	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
