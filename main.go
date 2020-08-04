@@ -176,7 +176,7 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
 			s.Up()
-			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds() && time.Now().Before(config.Sunrise); i++ {
+			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
