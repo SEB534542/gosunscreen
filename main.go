@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/smtp"
 	"strconv"
 	"sync"
 	"time"
@@ -18,15 +19,16 @@ import (
 var config = struct {
 	Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
 	Sunset                time.Time // Time after which Sunscreen no can shine on the Sunscreen area
-	SunsetThreshold       int       // minutes before sunset that Sunscreen no longer should go down
-	Interval              int       // interval for checking current light in seconds
-	LightGoodValue        int       // max measured light value that counts as "good weather"
-	LightGoodThreshold    int       // number of times light should be below lightGoodValue
-	LightNeutralValue     int       // max measured light value that counts as "neutral weather"
-	LightNeutralThreshold int       // number of times light should be above lightNeutralValue
+	SunsetThreshold       int       // Minutes before sunset that Sunscreen no longer should go down
+	Interval              int       // Interval for checking current light in seconds
+	LightGoodValue        int       // Max measured light value that counts as "good weather"
+	LightGoodThreshold    int       // Number of times light should be below lightGoodValue
+	LightNeutralValue     int       // Max measured light value that counts as "neutral weather"
+	LightNeutralThreshold int       // Number of times light should be above lightNeutralValue
 	LightBadValue         int       // max measured light value that counts as "bad weather"
 	LightBadThreshold     int       // number of times light should be above lightBadValue
-	AllowedOutliers       int       // number of outliers accepted in the measurement
+	AllowedOutliers       int       // Number of outliers accepted in the measurement
+	RefreshRate           int       // Number of seconds the main page should refresh
 }{}
 
 const up string = "up"
@@ -166,11 +168,11 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			}
 			continue
 		case time.Now().After(config.Sunset):
-			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
+			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
 			s.Up()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
-			fallthrough
+			continue
 		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
 			s.Up()
@@ -181,14 +183,14 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 				}
 				time.Sleep(time.Second)
 			}
-			log.Printf("Sun is up")
-		}
-		//if there is enough light gathered in ls.data, evaluate position
-			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen { 
+		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
+			//if there is enough light gathered in ls.data, evaluate position
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
 				mu.Lock()
 				s.evalPosition(ls.data)
 				mu.Unlock()
 			}
+		}
 		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
 		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
@@ -207,7 +209,7 @@ func (ls *lightSensor) monitorLight() {
 			mu.Lock()
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
 			//ensure ls.data doesnt get too long
-			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen { 
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
 			}
 			mu.Unlock()
@@ -262,10 +264,12 @@ func main() {
 func mainHandler(w http.ResponseWriter, req *http.Request) {
 	data := struct {
 		*Sunscreen
-		Time string
+		Time        string
+		RefreshRate int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
+		config.RefreshRate,
 	}
 
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -346,6 +350,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			log.Fatalln(err)
 		}
 		config.AllowedOutliers, err = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
