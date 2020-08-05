@@ -84,7 +84,9 @@ func (s *Sunscreen) Move() {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		mu.Lock()
 		s.pinUp.Low()
-		time.Sleep(time.Second * s.secUp)
+		for i:=0; i <= s.secUp; i++ {
+			time.Sleep(time.Second)
+		}
 		s.pinUp.High()
 		s.Position = up
 		mu.Unlock()
@@ -93,7 +95,9 @@ func (s *Sunscreen) Move() {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
 		mu.Lock()
 		s.pinDown.Low()
-		time.Sleep(time.Second * s.secDown)
+		for i:=0; i <= s.secDown; i++ {
+			time.Sleep(time.Second)
+		}
 		s.pinDown.High()
 		s.Position = down
 		mu.Unlock()
