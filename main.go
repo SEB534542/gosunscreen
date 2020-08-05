@@ -246,7 +246,7 @@ func init() {
 func main() {
 	rpio.Open()
 	defer rpio.Close()
-	for _, pin := range []rpio.Pin{sunscreenMain.pinDown, sunscreenMain.pinUp} {
+	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
 		pin.Output()
 		pin.High()
 	}
