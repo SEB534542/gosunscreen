@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/smtp"
 	"strconv"
 	"sync"
 	"time"
@@ -19,15 +20,16 @@ import (
 var config = struct {
 	Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
 	Sunset                time.Time // Time after which Sunscreen no can shine on the Sunscreen area
-	SunsetThreshold       int       // minutes before sunset that Sunscreen no longer should go down
-	Interval              int       // interval for checking current light in seconds
-	LightGoodValue        int       // max measured light value that counts as "good weather"
-	LightGoodThreshold    int       // number of times light should be below lightGoodValue
-	LightNeutralValue     int       // max measured light value that counts as "neutral weather"
-	LightNeutralThreshold int       // number of times light should be above lightNeutralValue
+	SunsetThreshold       int       // Minutes before sunset that Sunscreen no longer should go down
+	Interval              int       // Interval for checking current light in seconds
+	LightGoodValue        int       // Max measured light value that counts as "good weather"
+	LightGoodThreshold    int       // Number of times light should be below lightGoodValue
+	LightNeutralValue     int       // Max measured light value that counts as "neutral weather"
+	LightNeutralThreshold int       // Number of times light should be above lightNeutralValue
 	LightBadValue         int       // max measured light value that counts as "bad weather"
 	LightBadThreshold     int       // number of times light should be above lightBadValue
-	AllowedOutliers       int       // number of outliers accepted in the measurement
+	AllowedOutliers       int       // Number of outliers accepted in the measurement
+	RefreshRate           int       // Number of seconds the main page should refresh
 }{}
 
 const up string = "up"
@@ -119,7 +121,7 @@ func (s *Sunscreen) Down() {
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
-func (s *Sunscreen) reviewPosition(lightData []int) {
+func (s *Sunscreen) evalPosition(lightData []int) {
 	counter := 0
 	switch s.Position {
 	case up:
@@ -169,20 +171,20 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
-			for i := 0; float64(i) <= config.Sunset.Sub(time.Now()).Seconds(); i++ {
+			for config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
 				}
 				time.Sleep(time.Second)
 			}
-			fallthrough
+			continue
 		case time.Now().After(config.Sunset):
-			log.Printf("Sun is down (%v), adjusting Sunrise/set to tomorrow", config.Sunset.Format("2 Jan 15:04 MST"))
+			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
 			s.Up()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
-			fallthrough
+			continue
 		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
 			s.Up()
@@ -193,9 +195,14 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 				}
 				time.Sleep(time.Second)
 			}
-			log.Printf("Sun is up")
+		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
+			//if there is enough light gathered in ls.data, evaluate position
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
+				mu.Lock()
+				s.evalPosition(ls.data)
+				mu.Unlock()
+			}
 		}
-		s.reviewPosition(ls.data)
 		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
 		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
@@ -212,15 +219,16 @@ func (ls *lightSensor) monitorLight() {
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			mu.Lock()
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
-			// Ensure ls.data doesn't get too long
-			maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers
-			if len(ls.data) > maxLen {
+			//ensure ls.data doesnt get too long
+			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
 			}
 			mu.Unlock()
 		} else {
 			// Sun is not up
+			mu.Lock()
 			ls.data = []int{}
+			mu.Unlock()
 		}
 		for i := 0; i < config.Interval; i++ {
 			time.Sleep(time.Second)
@@ -271,14 +279,19 @@ func main() {
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
+	mu.Lock()
 	data := struct {
 		*Sunscreen
-		Time string
+		Time        string
+		RefreshRate int
+		Light []int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
+		config.RefreshRate,
+		ls1.data[MaxIntSlice(0, len(ls1.data)-10):len(ls1.data)],
 	}
-
+	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
@@ -315,6 +328,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		log.Fatalln(err)
 	}
 	if len(req.PostForm) != 0 {
+		mu.Lock()
 		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
 		if err != nil {
 			log.Fatalln(err)
@@ -359,7 +373,12 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
+		if err != nil {
+			log.Fatalln(err)
+		}
 		SaveToJson(config, configFile)
+		mu.Unlock()
 		log.Println("Updated variables")
 	}
 
@@ -406,5 +425,23 @@ func SaveToJson(i interface{}, fileName string) {
 	err = ioutil.WriteFile(fileName, bs, 0644)
 	if err != nil {
 		log.Fatal("Error", err)
+	}
+}
+
+// SendMail sends mail
+func sendMail() {
+	// Set up authentication information.
+	auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+
+	// Connect to the server, authenticate, set the sender and recipient,
+	// and send the email all in one step.
+	to := []string{"shj.vandermeulen@gmail.com"}
+	msg := []byte("To: shj.vandermeulen@gmail.com\r\n" +
+		"Subject: discount Gophers!\r\n" +
+		"\r\n" +
+		"This is the email body.\r\n")
+	err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
