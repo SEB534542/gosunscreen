@@ -53,7 +53,7 @@ var ls1 = &lightSensor{
 
 var s1 = &Sunscreen{
 	Mode:     auto,
-	Position: unknown,
+	Position: up,
 	secDown:  17,
 	secUp:    20,
 	pinDown:  rpio.Pin(21),
