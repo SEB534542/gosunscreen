@@ -11,11 +11,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"github.com/stianeikeland/go-rpio"
 )
-
-// https://pkg.go.dev/github.com/stianeikeland/go-rpio/v4?tab=doc
-// import "github.com/stianeikeland/go-rpio/v4"
 
 var config = struct {
 	Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
@@ -47,7 +43,7 @@ var fm = template.FuncMap{
 }
 
 var ls1 = &lightSensor{
-	pinLight: rpio.Pin(23),
+	pinLight: 23,
 	data:     []int{},
 }
 
@@ -56,28 +52,28 @@ var s1 = &Sunscreen{
 	Position: unknown,
 	secDown:  17,
 	secUp:    20,
-	pinDown:  rpio.Pin(21),
-  pinUp:    rpio.Pin(20),
+	pinDown:  21,
+	pinUp:    20,
 }
 
 func hourMinute(t time.Time) string {
 	return t.Format("15:04")
 }
 
-// A Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
+// Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	Mode     string // Mode of Sunscreen auto or manual
-	Position string // Current position of Sunscreen
-	secDown  int    // Seconds to move Sunscreen down
-	secUp    int    // Seconds to move Sunscreen up
-	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
+	Mode     string   // Mode of Sunscreen auto or manual
+	Position string   // Current position of Sunscreen
+	secDown  int      // Seconds to move Sunscreen down
+	secUp    int      // Seconds to move Sunscreen up
+	pinDown  int // GPIO pin for moving sunscreen down
+	pinUp    int // GPIO pin for moving sunscreen up
 }
 
-// A LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
+// LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight rpio.Pin   // pin for retrieving light value
-	data     []int // collected light values
+	pinLight int // pin for retrieving light value
+	data     []int    // collected light values
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -85,22 +81,18 @@ func (s *Sunscreen) Move() {
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		mu.Lock()
-		s.pinUp.Low()
-		for i:=0; i <= s.secUp; i++ {
+		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinUp.High()
 		s.Position = up
 		mu.Unlock()
 		// TODO: test if possible you can move it at the same time(!)
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
 		mu.Lock()
-		s.pinDown.Low()
-		for i:=0; i <= s.secDown; i++ {
+		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinDown.High()
 		s.Position = down
 		mu.Unlock()
 	}
@@ -256,12 +248,6 @@ func init() {
 }
 
 func main() {
-	rpio.Open()
-	defer rpio.Close()
-	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
-		pin.Output()
-		pin.High()
-	}
 	log.Println("--------Start of program--------")
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	go s1.Move()
@@ -284,7 +270,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		*Sunscreen
 		Time        string
 		RefreshRate int
-		Light []int
+		Light       []int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
