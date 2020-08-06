@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/stianeikeland/go-rpio"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -43,7 +44,7 @@ var fm = template.FuncMap{
 }
 
 var ls1 = &lightSensor{
-	pinLight: 23,
+	pinLight: rpio.Pin(23),
 	data:     []int{},
 }
 
@@ -52,8 +53,8 @@ var s1 = &Sunscreen{
 	Position: unknown,
 	secDown:  17,
 	secUp:    20,
-	pinDown:  21,
-	pinUp:    20,
+	pinDown:  rpio.Pin(21),
+	pinUp:    rpio.Pin(20),
 }
 
 func hourMinute(t time.Time) string {
@@ -66,13 +67,13 @@ type Sunscreen struct {
 	Position string   // Current position of Sunscreen
 	secDown  int      // Seconds to move Sunscreen down
 	secUp    int      // Seconds to move Sunscreen up
-	pinDown  int // GPIO pin for moving sunscreen down
-	pinUp    int // GPIO pin for moving sunscreen up
+	pinDown  rpio.Pin // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin // GPIO pin for moving sunscreen up
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight int // pin for retrieving light value
+	pinLight rpio.Pin // pin for retrieving light value
 	data     []int    // collected light values
 }
 
@@ -81,18 +82,22 @@ func (s *Sunscreen) Move() {
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		mu.Lock()
+		s.pinUp.Low()
 		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
+		s.pinUp.High()
 		s.Position = up
 		mu.Unlock()
 		// TODO: test if possible you can move it at the same time(!)
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
 		mu.Lock()
+		s.pinDown.Low()
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
+		s.pinDown.High()
 		s.Position = down
 		mu.Unlock()
 	}
@@ -248,6 +253,12 @@ func init() {
 }
 
 func main() {
+	rpio.Open()
+	defer rpio.Close()
+	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
+		pin.Output()
+		pin.High()
+	}
 	log.Println("--------Start of program--------")
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	go s1.Move()
