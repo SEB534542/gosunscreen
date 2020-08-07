@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"fmt"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -50,6 +51,7 @@ const unknown string = "unknown"
 const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
+
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{
@@ -61,7 +63,7 @@ var ls1 = &lightSensor{
 	data:     []int{},
 }
 var s1 = &Sunscreen{
-	Mode:     auto,
+	Mode:     manual,
 	Position: up,
 	secDown:  17,
 	secUp:    20,
@@ -72,25 +74,22 @@ var s1 = &Sunscreen{
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
 	old := s.Position
+	mu.Lock()
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
-		mu.Lock()
 		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
 		s.Position = up
-		mu.Unlock()
-		// TODO: test if possible you can move it at the same time(!)
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
-		mu.Lock()
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
 		s.Position = down
-		mu.Unlock()
 	}
-	
+	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, s.Position))
+	mu.Unlock()
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -249,11 +248,8 @@ func main() {
 		log.Println("Closing down...")
 		s1.Up()
 	}()
-	s1.Down() // TODO: remove this line and set position to up on start-up??
 	go ls1.monitorLight()
-	go s1.autoSunscreen(ls1)
-
-	log.Println(Launching website...)
+	log.Println("Launching website...")
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
@@ -418,4 +414,32 @@ func SaveToJson(i interface{}, fileName string) {
 
 func hourMinute(t time.Time) string {
 	return t.Format("15:04")
+}
+
+// SendMail sends mail to
+func sendMail(subj, body string) {
+	to := []string{"shj.vandermeulen@gmail.com"}
+	//Format message
+
+	var msgTo string
+	for i, s := range to {
+		if i != 0 {
+			msgTo = msgTo + ","
+		}
+		msgTo = msgTo + s
+	}
+
+	msg := []byte("To:" + msgTo + "\r\n" +
+		"Subject:" + subj + "\r\n" +
+		"\r\n" + body + "\r\n")
+
+	// Set up authentication information.
+	auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+
+	// Connect to the server, authenticate, set the sender and recipient,
+	// and send the email all in one step.
+	err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
