@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"fmt"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -43,6 +43,7 @@ var config = struct {
 	LightBadThreshold     int       // number of times light should be above lightBadValue
 	AllowedOutliers       int       // Number of outliers accepted in the measurement
 	RefreshRate           int       // Number of seconds the main page should refresh
+	EnableMail            bool      // Enable mail functionality
 }{}
 
 const up string = "up"
@@ -360,6 +361,14 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
+		}		
+		if req.PostForm["EnableMail"] == nil {
+			config.EnableMail = false
+		} else {
+			config.EnableMail, err = strconv.ParseBool(req.PostForm["EnableMail"][0])
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
 		SaveToJson(config, configFile)
 		mu.Unlock()
@@ -418,28 +427,31 @@ func hourMinute(t time.Time) string {
 
 // SendMail sends mail to
 func sendMail(subj, body string) {
-	to := []string{"shj.vandermeulen@gmail.com"}
-	//Format message
+	if config.EnableMail {
 
-	var msgTo string
-	for i, s := range to {
-		if i != 0 {
-			msgTo = msgTo + ","
+		to := []string{"shj.vandermeulen@gmail.com"}
+		//Format message
+
+		var msgTo string
+		for i, s := range to {
+			if i != 0 {
+				msgTo = msgTo + ","
+			}
+			msgTo = msgTo + s
 		}
-		msgTo = msgTo + s
-	}
 
-	msg := []byte("To:" + msgTo + "\r\n" +
-		"Subject:" + subj + "\r\n" +
-		"\r\n" + body + "\r\n")
+		msg := []byte("To:" + msgTo + "\r\n" +
+			"Subject:" + subj + "\r\n" +
+			"\r\n" + body + "\r\n")
 
-	// Set up authentication information.
-	auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+		// Set up authentication information.
+		auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
 
-	// Connect to the server, authenticate, set the sender and recipient,
-	// and send the email all in one step.
-	err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
-	if err != nil {
-		log.Fatal(err)
+		// Connect to the server, authenticate, set the sender and recipient,
+		// and send the email all in one step.
+		err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
