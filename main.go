@@ -428,10 +428,9 @@ func hourMinute(t time.Time) string {
 // SendMail sends mail to
 func sendMail(subj, body string) {
 	if config.EnableMail {
-
-		to := []string{"shj.vandermeulen@gmail.com"}
+		to := []string{"raspberrych57@gmail.com"}
+		
 		//Format message
-
 		var msgTo string
 		for i, s := range to {
 			if i != 0 {
