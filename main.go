@@ -3,7 +3,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/stianeikeland/go-rpio"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -12,7 +12,24 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"github.com/stianeikeland/go-rpio"
 )
+
+// Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
+type Sunscreen struct {
+	Mode     string // Mode of Sunscreen auto or manual
+	Position string // Current position of Sunscreen
+	secDown  int    // Seconds to move Sunscreen down
+	secUp    int    // Seconds to move Sunscreen up
+	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
+}
+
+// LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
+type lightSensor struct {
+	pinLight rpio.Pin   // pin for retrieving light value
+	data     []int // collected light values
+}
 
 var config = struct {
 	Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
@@ -27,6 +44,7 @@ var config = struct {
 	LightBadThreshold     int       // number of times light should be above lightBadValue
 	AllowedOutliers       int       // Number of outliers accepted in the measurement
 	RefreshRate           int       // Number of seconds the main page should refresh
+	EnableMail            bool      // Enable mail functionality
 }{}
 
 const up string = "up"
@@ -38,7 +56,6 @@ const configFile string = "config.json"
 
 var tpl *template.Template
 var mu sync.Mutex
-
 var fm = template.FuncMap{
 	"fdateHM": hourMinute,
 }
@@ -47,60 +64,38 @@ var ls1 = &lightSensor{
 	pinLight: rpio.Pin(23),
 	data:     []int{},
 }
-
 var s1 = &Sunscreen{
-	Mode:     auto,
-	Position: unknown,
+	Mode:     manual,
+	Position: up,
 	secDown:  17,
 	secUp:    20,
 	pinDown:  rpio.Pin(21),
 	pinUp:    rpio.Pin(20),
 }
 
-func hourMinute(t time.Time) string {
-	return t.Format("15:04")
-}
-
-// Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
-type Sunscreen struct {
-	Mode     string   // Mode of Sunscreen auto or manual
-	Position string   // Current position of Sunscreen
-	secDown  int      // Seconds to move Sunscreen down
-	secUp    int      // Seconds to move Sunscreen up
-	pinDown  rpio.Pin // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin // GPIO pin for moving sunscreen up
-}
-
-// LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
-type lightSensor struct {
-	pinLight rpio.Pin // pin for retrieving light value
-	data     []int    // collected light values
-}
-
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
+	old := s.Position
+	mu.Lock()
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
-		mu.Lock()
 		s.pinUp.Low()
 		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
 		s.pinUp.High()
 		s.Position = up
-		mu.Unlock()
-		// TODO: test if possible you can move it at the same time(!)
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
-		mu.Lock()
-		s.pinDown.Low()
+		s.pinUp.Low()
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinDown.High()
+		s.pinUp.High()
 		s.Position = down
-		mu.Unlock()
 	}
+	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, s.Position))
+	mu.Unlock()
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -253,22 +248,19 @@ func init() {
 }
 
 func main() {
+	log.Println("--------Start of program--------")
 	rpio.Open()
 	defer rpio.Close()
 	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
 		pin.Output()
 		pin.High()
-	}
-	log.Println("--------Start of program--------")
-	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
-	go s1.Move()
 	defer func() {
 		log.Println("Closing down...")
 		s1.Up()
 	}()
+	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	go ls1.monitorLight()
-	go s1.autoSunscreen(ls1)
-
+	log.Println("Launching website...")
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
@@ -299,6 +291,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 	mode := req.URL.Path[len("/mode/"):]
 	switch mode {
 	case auto:
+		mu.Lock()
 		if s1.Mode == manual {
 			go s1.autoSunscreen(ls1)
 			s1.Mode = auto
@@ -306,11 +299,16 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			log.Printf("Mode is already auto (%v)\n", s1.Mode)
 		}
+		mu.Unlock()
 	case manual + "/" + up:
+		mu.Lock()
 		s1.Mode = manual
+		mu.Unlock()
 		s1.Up()
 	case manual + "/" + down:
+		mu.Lock()
 		s1.Mode = manual
+		mu.Unlock()
 		s1.Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
@@ -373,6 +371,14 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
+		}		
+		if req.PostForm["EnableMail"] == nil {
+			config.EnableMail = false
+		} else {
+			config.EnableMail, err = strconv.ParseBool(req.PostForm["EnableMail"][0])
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
 		SaveToJson(config, configFile)
 		mu.Unlock()
@@ -425,20 +431,36 @@ func SaveToJson(i interface{}, fileName string) {
 	}
 }
 
-// SendMail sends mail
-func sendMail() {
-	// Set up authentication information.
-	auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+func hourMinute(t time.Time) string {
+	return t.Format("15:04")
+}
 
-	// Connect to the server, authenticate, set the sender and recipient,
-	// and send the email all in one step.
-	to := []string{"shj.vandermeulen@gmail.com"}
-	msg := []byte("To: shj.vandermeulen@gmail.com\r\n" +
-		"Subject: discount Gophers!\r\n" +
-		"\r\n" +
-		"This is the email body.\r\n")
-	err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
-	if err != nil {
-		log.Fatal(err)
+// SendMail sends mail to
+func sendMail(subj, body string) {
+	if config.EnableMail {
+		to := []string{"raspberrych57@gmail.com"}
+		
+		//Format message
+		var msgTo string
+		for i, s := range to {
+			if i != 0 {
+				msgTo = msgTo + ","
+			}
+			msgTo = msgTo + s
+		}
+
+		msg := []byte("To:" + msgTo + "\r\n" +
+			"Subject:" + subj + "\r\n" +
+			"\r\n" + body + "\r\n")
+
+		// Set up authentication information.
+		auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+
+		// Connect to the server, authenticate, set the sender and recipient,
+		// and send the email all in one step.
+		err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
