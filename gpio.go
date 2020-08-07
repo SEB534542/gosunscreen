@@ -38,7 +38,7 @@ func getLight() {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, getLightValue())
 	}
-	log.Println("Current light value is:", calcAverage(lightValues...))
+	log.Println("Current light value is:", calcAverage(lightValues...)/44)
 }
 
 func getLightValue() int {
