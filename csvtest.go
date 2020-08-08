@@ -24,9 +24,9 @@ func main() {
     }
 
     // add data
-    var data = [][]string{{"Line1", "Hello Readers of"}, {"Line2", "golangcode.com"}}
+    var data = [][]string{{"Line1", "Hello Readers of"}}
     log.Printf("%T", lines)
-    lines = append(lines, data...)
+    lines = append(lines, data)
  
     // write the file
     f, err = os.Create(file)
