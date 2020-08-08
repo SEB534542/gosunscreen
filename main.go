@@ -265,6 +265,9 @@ func main() {
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
 	stats := readCSV(csvFile)
+	if len(stats) != 0 {
+		stats = stats[MaxIntSlice(0, len(stats)-20):]
+	}
 	mu.Lock()	
 	data := struct {
 		*Sunscreen
@@ -277,7 +280,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
 		ls1.data,
-		stats[MaxIntSlice(1, len(stats)-20):],
+		stats,
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -468,7 +471,12 @@ func readCSV(file string) [][]string{
 	// Read the file
     f, err := os.Open(file)
     if err != nil {
-        log.Fatal(err)
+        f, err := os.Create(file)
+        if err != nil {
+			log.Fatal("Unable to create csv", err)
+		}
+        f.Close()
+        return [][]string{}
     }
     defer f.Close()
     r := csv.NewReader(f)
