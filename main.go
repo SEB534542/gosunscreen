@@ -460,8 +460,8 @@ func sendMail(subj, body string) {
 	}
 }
 
-func appendCSV(file string, data [][]string) {
-    // read the file
+func readCSV(file string) [][]string{
+	// Read the file
     f, err := os.Open(file)
     if err != nil {
         log.Fatal(err)
@@ -472,12 +472,19 @@ func appendCSV(file string, data [][]string) {
     if err != nil {
         log.Fatal(err)
     }
+    return lines
+}
 
-    // add data
-    lines = append(lines, data...)
+func appendCSV(file string, newLines [][]string) {
+	
+	// Get current data
+	lines := readCSV(file)
+
+    // Add new lines
+    lines = append(lines, newLines...)
  
-    // write the file
-    f, err = os.Create(file)
+    // Write the file
+    f, err := os.Create(file)
     if err != nil {
         log.Fatal(err)
     }
