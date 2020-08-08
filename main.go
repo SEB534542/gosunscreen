@@ -2,15 +2,15 @@
 package main
 
 import (
-	"encoding/json"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
-	"os"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/smtp"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -96,7 +96,7 @@ func (s *Sunscreen) Move() {
 	mode := s.Mode
 	mu.Unlock()
 	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
-	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -268,13 +268,13 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-20):]
 	}
-	mu.Lock()	
+	mu.Lock()
 	data := struct {
 		*Sunscreen
 		Time        string
 		RefreshRate int
 		Light       []int
-		Stats [][]string
+		Stats       [][]string
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
@@ -373,7 +373,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
-		}		
+		}
 		if req.PostForm["EnableMail"] == nil {
 			config.EnableMail = false
 		} else {
@@ -441,7 +441,7 @@ func hourMinute(t time.Time) string {
 func sendMail(subj, body string) {
 	if config.EnableMail {
 		to := []string{"raspberrych57@gmail.com"}
-		
+
 		//Format message
 		var msgTo string
 		for i, s := range to {
@@ -467,41 +467,41 @@ func sendMail(subj, body string) {
 	}
 }
 
-func readCSV(file string) [][]string{
+func readCSV(file string) [][]string {
 	// Read the file
-    f, err := os.Open(file)
-    if err != nil {
-        f, err := os.Create(file)
-        if err != nil {
+	f, err := os.Open(file)
+	if err != nil {
+		f, err := os.Create(file)
+		if err != nil {
 			log.Fatal("Unable to create csv", err)
 		}
-        f.Close()
-        return [][]string{}
-    }
-    defer f.Close()
-    r := csv.NewReader(f)
-    lines, err := r.ReadAll()
-    if err != nil {
-        log.Fatal(err)
-    }
-    return lines
+		f.Close()
+		return [][]string{}
+	}
+	defer f.Close()
+	r := csv.NewReader(f)
+	lines, err := r.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return lines
 }
 
 func appendCSV(file string, newLines [][]string) {
-	
+
 	// Get current data
 	lines := readCSV(file)
 
-    // Add new lines
-    lines = append(lines, newLines...)
- 
-    // Write the file
-    f, err := os.Create(file)
-    if err != nil {
-        log.Fatal(err)
-    }
-    w := csv.NewWriter(f)
-    if err = w.WriteAll(lines); err != nil {
-        log.Fatal(err)     
-    }
+	// Add new lines
+	lines = append(lines, newLines...)
+
+	// Write the file
+	f, err := os.Create(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w := csv.NewWriter(f)
+	if err = w.WriteAll(lines); err != nil {
+		log.Fatal(err)
+	}
 }
