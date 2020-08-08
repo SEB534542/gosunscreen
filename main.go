@@ -54,6 +54,7 @@ const unknown string = "unknown"
 const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
+const csvFile string = "sunscreen_stats.csv"
 
 var tpl *template.Template
 var mu sync.Mutex
@@ -95,7 +96,7 @@ func (s *Sunscreen) Move() {
 	mode := s.Mode
 	mu.Unlock()
 	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
-	appendCSV("sunscreen_stats.csv", [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -263,17 +264,20 @@ func main() {
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
-	mu.Lock()
+	stats := readCSV(csvFile)
+	mu.Lock()	
 	data := struct {
 		*Sunscreen
 		Time        string
 		RefreshRate int
 		Light       []int
+		Stats [][]string
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
 		ls1.data,
+		stats[MaxIntSlice(1, len(stats)-20):],
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
