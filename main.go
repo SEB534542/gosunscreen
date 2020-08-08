@@ -3,13 +3,14 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
-	"os"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/smtp"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -18,27 +19,18 @@ import (
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	Mode     string // Mode of Sunscreen auto or manual
-	Position string // Current position of Sunscreen
-	secDown  int    // Seconds to move Sunscreen down
-	secUp    int    // Seconds to move Sunscreen up
-<<<<<<< HEAD
+	Mode     string      // Mode of Sunscreen auto or manual
+	Position string      // Current position of Sunscreen
+	secDown  int         // Seconds to move Sunscreen down
+	secUp    int         // Seconds to move Sunscreen up<<<<<<< HEAD
 	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
 	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
-=======
-	pinDown  int    // GPIO pin for moving sunscreen down
-	pinUp    int    // GPIO pin for moving sunscreen up
->>>>>>> master
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-<<<<<<< HEAD
 	pinLight rpio.Pin   // pin for retrieving light value
-=======
-	pinLight int   // pin for retrieving light value
->>>>>>> master
-	data     []int // collected light values
+	data     []int      // collected light values
 }
 
 var config = struct {
@@ -80,13 +72,8 @@ var s1 = &Sunscreen{
 	Position: up,
 	secDown:  17,
 	secUp:    20,
-<<<<<<< HEAD
 	pinDown:  rpio.Pin(21),
 	pinUp:    rpio.Pin(20),
-=======
-	pinDown:  21,
-	pinUp:    20,
->>>>>>> master
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -95,10 +82,7 @@ func (s *Sunscreen) Move() {
 	mu.Lock()
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
-<<<<<<< HEAD
 		s.pinUp.Low()
-=======
->>>>>>> master
 		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
@@ -106,26 +90,18 @@ func (s *Sunscreen) Move() {
 		s.Position = up
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
-<<<<<<< HEAD
 		s.pinUp.Low()
-=======
->>>>>>> master
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
 		s.pinUp.High()
 		s.Position = down
 	}
-<<<<<<< HEAD
-	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, s.Position))
-	mu.Unlock()
-=======
 	new := s.Position
 	mode := s.Mode
 	mu.Unlock()
 	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
 	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
->>>>>>> master
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -302,13 +278,13 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-20):]
 	}
-	mu.Lock()	
+	mu.Lock()
 	data := struct {
 		*Sunscreen
 		Time        string
 		RefreshRate int
 		Light       []int
-		Stats [][]string
+		Stats       [][]string
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
@@ -407,7 +383,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
-		}		
+		}
 		if req.PostForm["EnableMail"] == nil {
 			config.EnableMail = false
 		} else {
@@ -475,7 +451,7 @@ func hourMinute(t time.Time) string {
 func sendMail(subj, body string) {
 	if config.EnableMail {
 		to := []string{"raspberrych57@gmail.com"}
-		
+
 		//Format message
 		var msgTo string
 		for i, s := range to {
@@ -501,41 +477,41 @@ func sendMail(subj, body string) {
 	}
 }
 
-func readCSV(file string) [][]string{
+func readCSV(file string) [][]string {
 	// Read the file
-    f, err := os.Open(file)
-    if err != nil {
-        f, err := os.Create(file)
-        if err != nil {
+	f, err := os.Open(file)
+	if err != nil {
+		f, err := os.Create(file)
+		if err != nil {
 			log.Fatal("Unable to create csv", err)
 		}
-        f.Close()
-        return [][]string{}
-    }
-    defer f.Close()
-    r := csv.NewReader(f)
-    lines, err := r.ReadAll()
-    if err != nil {
-        log.Fatal(err)
-    }
-    return lines
+		f.Close()
+		return [][]string{}
+	}
+	defer f.Close()
+	r := csv.NewReader(f)
+	lines, err := r.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return lines
 }
 
 func appendCSV(file string, newLines [][]string) {
-	
+
 	// Get current data
 	lines := readCSV(file)
 
-    // Add new lines
-    lines = append(lines, newLines...)
- 
-    // Write the file
-    f, err := os.Create(file)
-    if err != nil {
-        log.Fatal(err)
-    }
-    w := csv.NewWriter(f)
-    if err = w.WriteAll(lines); err != nil {
-        log.Fatal(err)     
-    }
+	// Add new lines
+	lines = append(lines, newLines...)
+
+	// Write the file
+	f, err := os.Create(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w := csv.NewWriter(f)
+	if err = w.WriteAll(lines); err != nil {
+		log.Fatal(err)
+	}
 }
