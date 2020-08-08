@@ -3,7 +3,9 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/csv"
 	"fmt"
+	"os"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -89,8 +91,11 @@ func (s *Sunscreen) Move() {
 		}
 		s.Position = down
 	}
-	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, s.Position))
+	new := s.Position
+	mode := s.Mode
 	mu.Unlock()
+	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
+	appendCSV("sunscreen_stats.csv", [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -268,7 +273,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
-		ls1.data[MaxIntSlice(0, len(ls1.data)-10):len(ls1.data)],
+		ls1.data,
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -453,4 +458,31 @@ func sendMail(subj, body string) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func appendCSV(file string, data [][]string) {
+    // read the file
+    f, err := os.Open(file)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer f.Close()
+    r := csv.NewReader(f)
+    lines, err := r.ReadAll()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // add data
+    lines = append(lines, data...)
+ 
+    // write the file
+    f, err = os.Create(file)
+    if err != nil {
+        log.Fatal(err)
+    }
+    w := csv.NewWriter(f)
+    if err = w.WriteAll(lines); err != nil {
+        log.Fatal(err)     
+    }
 }
