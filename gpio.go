@@ -8,9 +8,6 @@ import (
 	"os"
 )
 
-// lowest measured value (neutral?): 150
-// Good weather = 115
-
 var pin rpio.Pin = rpio.Pin(23)
 
 func main() {
@@ -37,7 +34,7 @@ func getLight() {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, getLightValue())
 	}
-	log.Println("Current light value is:", calcAverage(lightValues...)/44)
+	log.Println("Current light value is:", calcAverage(lightValues...)/31)
 }
 
 func getLightValue() int {
