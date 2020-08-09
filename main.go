@@ -290,6 +290,7 @@ func main() {
 	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
 		pin.Output()
 		pin.High()
+	}
 	defer func() {
 		log.Println("Closing down...")
 		s1.Up()
