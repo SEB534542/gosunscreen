@@ -46,6 +46,7 @@ var config = struct {
 	AllowedOutliers       int       // Number of outliers accepted in the measurement
 	RefreshRate           int       // Number of seconds the main page should refresh
 	EnableMail            bool      // Enable mail functionality
+	MoveHistory           int       // Number of sunscreen movements to be shown
 }{}
 
 const up string = "up"
@@ -266,7 +267,7 @@ func main() {
 func mainHandler(w http.ResponseWriter, req *http.Request) {
 	stats := readCSV(csvFile)
 	if len(stats) != 0 {
-		stats = stats[MaxIntSlice(0, len(stats)-20):]
+		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
 	}
 	mu.Lock()
 	data := struct {
@@ -275,12 +276,14 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		RefreshRate int
 		Light       []int
 		Stats       [][]string
+		MoveHistory int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
 		ls1.data,
 		stats,
+		config.MoveHistory,
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -334,43 +337,43 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.SunsetThreshold, err = strconv.Atoi(req.PostForm["SunsetThreshold"][0])
+		config.SunsetThreshold, err = strToInt(req.PostForm["SunsetThreshold"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.Interval, err = strconv.Atoi(req.PostForm["Interval"][0])
+		config.Interval, err = strToInt(req.PostForm["Interval"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightGoodValue, err = strconv.Atoi(req.PostForm["LightGoodValue"][0])
+		config.LightGoodValue, err = strToInt(req.PostForm["LightGoodValue"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightGoodThreshold, err = strconv.Atoi(req.PostForm["LightGoodThreshold"][0])
+		config.LightGoodThreshold, err = strToInt(req.PostForm["LightGoodThreshold"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightNeutralValue, err = strconv.Atoi(req.PostForm["LightNeutralValue"][0])
+		config.LightNeutralValue, err = strToInt(req.PostForm["LightNeutralValue"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightNeutralThreshold, err = strconv.Atoi(req.PostForm["LightNeutralThreshold"][0])
+		config.LightNeutralThreshold, err = strToInt(req.PostForm["LightNeutralThreshold"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightBadValue, err = strconv.Atoi(req.PostForm["LightBadValue"][0])
+		config.LightBadValue, err = strToInt(req.PostForm["LightBadValue"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightBadThreshold, err = strconv.Atoi(req.PostForm["LightBadThreshold"][0])
+		config.LightBadThreshold, err = strToInt(req.PostForm["LightBadThreshold"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.AllowedOutliers, err = strconv.Atoi(req.PostForm["AllowedOutliers"][0])
+		config.AllowedOutliers, err = strToInt(req.PostForm["AllowedOutliers"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.RefreshRate, err = strconv.Atoi(req.PostForm["RefreshRate"][0])
+		config.RefreshRate, err = strToInt(req.PostForm["RefreshRate"][0])
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -381,6 +384,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				log.Fatalln(err)
 			}
+		}
+		config.MoveHistory, err = strToInt(req.PostForm["MoveHistory"][0])
+		if err != nil {
+			log.Fatalln(err)
 		}
 		SaveToJson(config, configFile)
 		mu.Unlock()
@@ -504,4 +511,16 @@ func appendCSV(file string, newLines [][]string) {
 	if err = w.WriteAll(lines); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// strToInt transforms string to an int and returns a positive int or zero
+func strToInt(s string) (int, error){
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	if i < 0 {
+		return 0, err
+	} 
+	return i, err
 }
