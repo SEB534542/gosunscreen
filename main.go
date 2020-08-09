@@ -159,10 +159,39 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 	}
 }
 
-// GetCurrentLight collects the input from the light sensor ls and returns the value as a slice of int
+// GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
 func (ls *lightSensor) GetCurrentLight() []int {
-	// TODO: measure light
-	return []int{5}
+	lightValues := []int{}
+	for i := 0; i < 10; i++ {
+		lightValues = append(lightValues, getLightValue())
+	}
+	return []int{calcAverage(lightValues...)/31}
+}
+
+func getLightValue() int {
+	count := 0
+	// Output on the pin for 0.1 seconds
+	pin.Output()
+	pin.Low()
+	time.Sleep(100 * time.Millisecond)
+
+	// Change the pin back to input
+	pin.Input()
+
+	// Count until the pin goes high
+	for pin.Read() == rpio.Low {
+		count++
+	}
+	// log.Println("Current light value is:", count)
+	return count
+}
+
+func calcAverage(xi ...int) int {
+	total := 0
+	for _, v := range xi {
+		total = total + v
+	}
+	return total / len(xi)
 }
 
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
