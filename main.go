@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/stianeikeland/go-rpio"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -14,23 +15,22 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"github.com/stianeikeland/go-rpio"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	Mode     string      // Mode of Sunscreen auto or manual
-	Position string      // Current position of Sunscreen
-	secDown  int         // Seconds to move Sunscreen down
-	secUp    int         // Seconds to move Sunscreen up<<<<<<< HEAD
-	pinDown  rpio.Pin    // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin    // GPIO pin for moving sunscreen up
+	Mode     string   // Mode of Sunscreen auto or manual
+	Position string   // Current position of Sunscreen
+	secDown  int      // Seconds to move Sunscreen down
+	secUp    int      // Seconds to move Sunscreen up<<<<<<< HEAD
+	pinDown  rpio.Pin // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin // GPIO pin for moving sunscreen up
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight rpio.Pin   // pin for retrieving light value
-	data     []int      // collected light values
+	pinLight rpio.Pin // pin for retrieving light value
+	data     []int    // collected light values
 }
 
 var config = struct {
@@ -102,7 +102,7 @@ func (s *Sunscreen) Move() {
 	mode := s.Mode
 	mu.Unlock()
 	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
-	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})	
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -165,7 +165,7 @@ func (ls *lightSensor) GetCurrentLight() []int {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, getLightValue())
 	}
-	return []int{calcAverage(lightValues...)/31}
+	return []int{calcAverage(lightValues...) / 31}
 }
 
 func getLightValue() int {
@@ -554,13 +554,13 @@ func appendCSV(file string, newLines [][]string) {
 }
 
 // strToInt transforms string to an int and returns a positive int or zero
-func strToInt(s string) (int, error){
+func strToInt(s string) (int, error) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, err
 	}
 	if i < 0 {
 		return 0, err
-	} 
+	}
 	return i, err
 }
