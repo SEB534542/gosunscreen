@@ -91,11 +91,11 @@ func (s *Sunscreen) Move() {
 		s.Position = up
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
-		s.pinUp.Low()
+		s.pinDown.Low()
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinUp.High()
+		s.pinDown.High()
 		s.Position = down
 	}
 	new := s.Position
@@ -163,23 +163,23 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 func (ls *lightSensor) GetCurrentLight() []int {
 	lightValues := []int{}
 	for i := 0; i < 10; i++ {
-		lightValues = append(lightValues, getLightValue())
+		lightValues = append(lightValues, ls.getLightValue())
 	}
 	return []int{calcAverage(lightValues...) / 31}
 }
 
-func getLightValue() int {
+func (ls *lightSensor) getLightValue() int {
 	count := 0
 	// Output on the pin for 0.1 seconds
-	pin.Output()
-	pin.Low()
+	ls.pinLight.Output()
+	ls.pinLight.Low()
 	time.Sleep(100 * time.Millisecond)
 
 	// Change the pin back to input
-	pin.Input()
+	ls.pinLight.Input()
 
 	// Count until the pin goes high
-	for pin.Read() == rpio.Low {
+	for ls.pinLight.Read() == rpio.Low {
 		count++
 	}
 	// log.Println("Current light value is:", count)
