@@ -57,6 +57,7 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
+const lightFactor = 31
 
 var tpl *template.Template
 var mu sync.Mutex
@@ -169,7 +170,7 @@ func (ls *lightSensor) GetCurrentLight() []int {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, ls.getLightValue())
 	}
-	return []int{calcAverage(lightValues...) / 31}
+	return []int{calcAverage(lightValues...) / lightFactor}
 }
 
 func (ls *lightSensor) getLightValue() int {
