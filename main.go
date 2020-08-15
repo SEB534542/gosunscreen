@@ -96,7 +96,7 @@ func (s *Sunscreen) Move() {
 	new := s.Position
 	mode := s.Mode
 	mu.Unlock()
-	sendMail("Moved sunscreen "+s.Position, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
+	sendMail("Moved sunscreen "+new, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
 	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})
 }
 
@@ -175,24 +175,34 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
 				}
+				mu.Unlock()
 				time.Sleep(time.Second)
+				mu.Lock()
 			}
+			mu.Unlock()
 			continue
 		case time.Now().After(config.Sunset):
 			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
+			mu.Unlock()
 			s.Up()
+			mu.Lock()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
+			mu.Unlock()
 			continue
 		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
+			mu.Unlock()
 			s.Up()
+			mu.Lock()
 			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					return
 				}
+				mu.Unlock()
 				time.Sleep(time.Second)
+				mu.Lock()
 			}
 		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
 			//if there is enough light gathered in ls.data, evaluate position
@@ -277,7 +287,9 @@ func main() {
 func mainHandler(w http.ResponseWriter, req *http.Request) {
 	stats := readCSV(csvFile)
 	if len(stats) != 0 {
+		mu.Lock()
 		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
+		mu.Unlock()
 	}
 	mu.Lock()
 	data := struct {
