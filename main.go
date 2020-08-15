@@ -122,6 +122,7 @@ func (s *Sunscreen) Down() {
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
 func (s *Sunscreen) evalPosition(lightData []int) {
 	counter := 0
+	mu.Lock()
 	switch s.Position {
 	case up:
 		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
@@ -131,31 +132,34 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 			}
 		}
 		if counter >= config.LightGoodThreshold {
+			mu.Unlock()
 			s.Move()
 			return
 		}
 	case down:
 		log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
-
-		for _, v := range lightData[:(config.LightNeutralThreshold + config.AllowedOutliers)] {
-			if v >= config.LightNeutralValue {
-				counter++
-			}
-		}
-		if counter >= config.LightNeutralThreshold {
-			s.Move()
-			return
-		}
-
 		for _, v := range lightData[:(config.LightBadThreshold + config.AllowedOutliers)] {
 			if v >= config.LightBadValue {
 				counter++
 			}
 		}
 		if counter >= config.LightBadThreshold {
+			mu.Unlock()
 			s.Move()
 			return
 		}
+		counter = 0
+		for _, v := range lightData[:(config.LightNeutralThreshold + config.AllowedOutliers)] {
+			if v >= config.LightNeutralValue {
+				counter++
+			}
+		}
+		if counter >= config.LightNeutralThreshold {
+			mu.Unlock()
+			s.Move()
+			return
+		}
+	mu.Unlock()
 	}
 }
 
@@ -196,6 +200,7 @@ func calcAverage(xi ...int) int {
 
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
+		mu.Lock()
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
@@ -226,17 +231,23 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
 			//if there is enough light gathered in ls.data, evaluate position
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
-				mu.Lock()
-				s.evalPosition(ls.data)
 				mu.Unlock()
+				s.evalPosition(ls.data)
+				mu.Lock()
+			} else {
+				log.Println("Not enough light gathered...")
 			}
 		}
-		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
-		for i := 0; i < config.Interval; i++ {
+		interval := config.Interval
+		mu.Unlock()
+		log.Printf("Completed cycle, sleeping for %v second(s)...\n", interval)
+		for i := 0; i < interval; i++ {
+			mu.Lock()
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
 				return
 			}
+			mu.Unlock()
 			time.Sleep(time.Second)
 		}
 	}
@@ -244,21 +255,20 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 
 func (ls *lightSensor) monitorLight() {
 	for {
+		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
-			mu.Lock()
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
 			//ensure ls.data doesnt get too long
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
 			}
-			mu.Unlock()
 		} else {
 			// Sun is not up
-			mu.Lock()
 			ls.data = []int{}
-			mu.Unlock()
 		}
-		for i := 0; i < config.Interval; i++ {
+		interval := config.Interval
+		mu.Unlock()
+		for i := 0; i < interval; i++ {
 			time.Sleep(time.Second)
 		}
 	}
