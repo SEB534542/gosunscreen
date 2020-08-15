@@ -57,7 +57,7 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
-const lightFactor = 31
+const lightFactor = 33
 
 var tpl *template.Template
 var mu sync.Mutex
