@@ -47,6 +47,7 @@ var config = struct {
 	RefreshRate           int       // Number of seconds the main page should refresh
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
+	Notes				  string    // Field to store comments/notes
 }{}
 
 const up string = "up"
@@ -400,6 +401,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		config.MoveHistory, err = strToInt(req.PostForm["MoveHistory"][0])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		config.Notes = req.PostForm["Notes"][0]
 		if err != nil {
 			log.Fatalln(err)
 		}
