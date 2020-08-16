@@ -79,7 +79,6 @@ var s1 = &Sunscreen{
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
 	old := s.Position
-	mu.Lock()
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		for i := 0; i <= s.secUp; i++ {
@@ -95,7 +94,6 @@ func (s *Sunscreen) Move() {
 	}
 	new := s.Position
 	mode := s.Mode
-	mu.Unlock()
 	sendMail("Moved sunscreen "+new, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
 	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})
 }
@@ -117,7 +115,6 @@ func (s *Sunscreen) Down() {
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
 func (s *Sunscreen) evalPosition(lightData []int) {
 	counter := 0
-	mu.Lock()
 	switch s.Position {
 	case up:
 		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
@@ -127,7 +124,6 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 			}
 		}
 		if counter >= config.LightGoodThreshold {
-			mu.Unlock()
 			s.Move()
 			return
 		}
@@ -139,7 +135,6 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 			}
 		}
 		if counter >= config.LightBadThreshold {
-			mu.Unlock()
 			s.Move()
 			return
 		}
@@ -150,11 +145,9 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 			}
 		}
 		if counter >= config.LightNeutralThreshold {
-			mu.Unlock()
 			s.Move()
 			return
 		}
-	mu.Unlock()
 	}
 }
 
@@ -173,6 +166,7 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			for config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
+					mu.Unlock()
 					return
 				}
 				mu.Unlock()
@@ -183,21 +177,18 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 			continue
 		case time.Now().After(config.Sunset):
 			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
-			mu.Unlock()
 			s.Up()
-			mu.Lock()
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 			mu.Unlock()
 			continue
 		case time.Now().Before(config.Sunrise):
 			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
-			mu.Unlock()
 			s.Up()
-			mu.Lock()
 			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
+					mu.Unlock()
 					return
 				}
 				mu.Unlock()
@@ -207,25 +198,23 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
 			//if there is enough light gathered in ls.data, evaluate position
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
-				mu.Unlock()
 				s.evalPosition(ls.data)
-				mu.Lock()
 			} else {
 				log.Println("Not enough light gathered...")
 			}
 		}
-		interval := config.Interval
-		mu.Unlock()
-		log.Printf("Completed cycle, sleeping for %v second(s)...\n", interval)
-		for i := 0; i < interval; i++ {
-			mu.Lock()
+		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
+		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
+				mu.Unlock()
 				return
 			}
 			mu.Unlock()
 			time.Sleep(time.Second)
+			mu.Lock()
 		}
+		mu.Unlock()
 	}
 }
 
@@ -274,7 +263,9 @@ func main() {
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	defer func() {
 		log.Println("Closing down...")
+		mu.Lock()
 		s1.Up()
+		mu.Unlock()
 	}()
 	go ls1.monitorLight()
 	log.Println("Launching website...")
@@ -286,12 +277,10 @@ func main() {
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
 	stats := readCSV(csvFile)
-	if len(stats) != 0 {
-		mu.Lock()
-		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
-		mu.Unlock()
-	}
 	mu.Lock()
+	if len(stats) != 0 {
+		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
+	}
 	data := struct {
 		*Sunscreen
 		Time        string
@@ -316,9 +305,9 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 
 func modeHandler(w http.ResponseWriter, req *http.Request) {
 	mode := req.URL.Path[len("/mode/"):]
+	mu.Lock()
 	switch mode {
 	case auto:
-		mu.Lock()
 		if s1.Mode == manual {
 			go s1.autoSunscreen(ls1)
 			s1.Mode = auto
@@ -326,21 +315,17 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			log.Printf("Mode is already auto (%v)\n", s1.Mode)
 		}
-		mu.Unlock()
 	case manual + "/" + up:
-		mu.Lock()
 		s1.Mode = manual
-		mu.Unlock()
 		s1.Up()
 	case manual + "/" + down:
-		mu.Lock()
 		s1.Mode = manual
-		mu.Unlock()
 		s1.Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
 	}
 	log.Println("Mode=", s1.Mode, "and Position=", s1.Position)
+	mu.Unlock()
 	http.Redirect(w, req, "/", http.StatusFound)
 }
 
@@ -349,8 +334,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	mu.Lock()
 	if len(req.PostForm) != 0 {
-		mu.Lock()
 		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
 		if err != nil {
 			log.Fatalln(err)
@@ -412,10 +397,9 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			log.Fatalln(err)
 		}
 		SaveToJson(config, configFile)
-		mu.Unlock()
 		log.Println("Updated variables")
 	}
-
+	mu.Unlock()
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
 	if err != nil {
 		log.Fatalln(err)
