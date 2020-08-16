@@ -160,6 +160,11 @@ func (ls *lightSensor) GetCurrentLight() []int {
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
 		mu.Lock()
+		if s.Mode != auto {
+			log.Println("Mode is no longer auto, closing auto func")
+			mu.Unlock()
+			return
+		}
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
@@ -283,11 +288,11 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	data := struct {
 		*Sunscreen
-		Time        string
-		RefreshRate int
-		Light       []int
-		Stats       [][]string
-		MoveHistory int
+		Time         string
+		RefreshRate  int
+		Light        []int
+		Stats        [][]string
+		MoveHistory  int
 		LightHistory int
 	}{
 		s1,
@@ -522,13 +527,13 @@ func appendCSV(file string, newLines [][]string) {
 }
 
 // strToInt transforms string to an int and returns a positive int or zero
-func strToInt(s string) (int, error){
+func strToInt(s string) (int, error) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, err
 	}
 	if i < 0 {
 		return 0, err
-	} 
+	}
 	return i, err
 }
