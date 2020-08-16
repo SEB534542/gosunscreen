@@ -57,6 +57,7 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
+const logFile string = "logfile.log"
 
 var tpl *template.Template
 var mu sync.Mutex
@@ -265,6 +266,14 @@ func init() {
 }
 
 func main() {
+	f, err := os.Open(logFile)
+	if err != nil {
+		fmt.Println("Error", err)
+		os.Create(logFile)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	log.Println("--------Start of program--------")
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	defer func() {
@@ -278,6 +287,7 @@ func main() {
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
+	http.HandleFunc("/log/", configHandler)
 	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
 }
 
@@ -413,6 +423,16 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	mu.Unlock()
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func logHandler(w http.ResponseWriter, req *http.Request) {
+	
+	
+	
+	err := tpl.ExecuteTemplate(w, "log.gohtml", nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
