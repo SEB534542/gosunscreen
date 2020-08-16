@@ -288,6 +288,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		Light       []int
 		Stats       [][]string
 		MoveHistory int
+		LightHistory int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
@@ -295,6 +296,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		ls1.data,
 		stats,
 		config.MoveHistory,
+		len(ls1.data),
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
