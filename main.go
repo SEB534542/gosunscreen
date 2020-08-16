@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"strings"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -48,6 +49,7 @@ var config = struct {
 	RefreshRate           int       // Number of seconds the main page should refresh
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
+	Notes				  string    // Field to store comments/notes
 }{}
 
 const up string = "up"
@@ -59,6 +61,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFactor = 33
 
+var logFile string = "logfile"  + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{
@@ -101,7 +104,7 @@ func (s *Sunscreen) Move() {
 	new := s.Position
 	mode := s.Mode
 	sendMail("Moved sunscreen "+new, fmt.Sprint("Sunscreen moved from %s to %s", old, new))
-	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new}})
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05 MST"), mode, old, new, fmt.Sprint(ls1.data)}})
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -195,6 +198,11 @@ func calcAverage(xi ...int) int {
 func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	for {
 		mu.Lock()
+		if s.Mode != auto {
+			log.Println("Mode is no longer auto, closing auto func")
+			mu.Unlock()
+			return
+		}
 		switch {
 		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
 			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
@@ -294,6 +302,13 @@ func init() {
 }
 
 func main() {
+	// Storing log in a file
+	f, err := os.Create("./logs/" + logFile)
+	if err != nil {
+		fmt.Println("Error", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
 	log.Println("--------Start of program--------")
 	rpio.Open()
 	defer rpio.Close()
@@ -313,6 +328,7 @@ func main() {
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
+	http.HandleFunc("/log/", logHandler)
 	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
 }
 
@@ -324,11 +340,12 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	data := struct {
 		*Sunscreen
-		Time        string
-		RefreshRate int
-		Light       []int
-		Stats       [][]string
-		MoveHistory int
+		Time         string
+		RefreshRate  int
+		Light        []int
+		Stats        [][]string
+		MoveHistory  int
+		LightHistory int
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
@@ -336,6 +353,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		ls1.data,
 		stats,
 		config.MoveHistory,
+		len(ls1.data),
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -437,11 +455,35 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		config.Notes = req.PostForm["Notes"][0]
+		if err != nil {
+			log.Fatalln(err)
+		}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
 	mu.Unlock()
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func logHandler(w http.ResponseWriter, req *http.Request) {	
+   f, err := ioutil.ReadFile("./logs/" + logFile)
+   if err != nil {
+        fmt.Println("File reading error", err)
+        return
+    }
+    lines := strings.Split(string(f), "\n")   
+	data := struct {
+		FileName string
+		LogOutput []string
+	}{
+		logFile,
+		lines,
+	}
+	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
 	}
