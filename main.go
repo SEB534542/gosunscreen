@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"strings"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -58,8 +59,7 @@ const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 
-// var logFile string = "logfile"  + " " + time.Now().Format("2006-01-02 150405") + ".log"
-var logFile string = "logfile.log"
+var logFile string = "logfile"  + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{
@@ -267,15 +267,13 @@ func init() {
 }
 
 func main() {
-	/*
 	// Storing log in a file
-	f, err := os.Create(logFile)
+	f, err := os.Create("./logs/" + logFile)
 	if err != nil {
 		fmt.Println("Error", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
-	*/
 	log.Println("--------Start of program--------")
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	defer func() {
@@ -431,23 +429,23 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func logHandler(w http.ResponseWriter, req *http.Request) {	
-   f, err := ioutil.ReadFile(logFile)
+   f, err := ioutil.ReadFile("./logs/" + logFile)
    if err != nil {
         fmt.Println("File reading error", err)
         return
     }
+    lines := strings.Split(string(f), "\n")   
 	data := struct {
 		FileName string
-		LogOutput string
+		LogOutput []string
 	}{
 		logFile,
-		fmt.Sprintf("%q", f),
+		lines,
 	}
 	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 }
 
 // StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
