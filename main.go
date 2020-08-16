@@ -57,8 +57,9 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
-const logFile string = "logfile.log"
 
+// var logFile string = "logfile"  + " " + time.Now().Format("2006-01-02 150405") + ".log"
+var logFile string = "logfile.log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{
@@ -266,14 +267,15 @@ func init() {
 }
 
 func main() {
-	f, err := os.Open(logFile)
+	/*
+	// Storing log in a file
+	f, err := os.Create(logFile)
 	if err != nil {
 		fmt.Println("Error", err)
-		os.Create(logFile)
 	}
 	defer f.Close()
 	log.SetOutput(f)
-
+	*/
 	log.Println("--------Start of program--------")
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	defer func() {
@@ -287,7 +289,7 @@ func main() {
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
-	http.HandleFunc("/log/", configHandler)
+	http.HandleFunc("/log/", logHandler)
 	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
 }
 
@@ -428,14 +430,24 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func logHandler(w http.ResponseWriter, req *http.Request) {
-	
-	
-	
-	err := tpl.ExecuteTemplate(w, "log.gohtml", nil)
+func logHandler(w http.ResponseWriter, req *http.Request) {	
+   f, err := ioutil.ReadFile(logFile)
+   if err != nil {
+        fmt.Println("File reading error", err)
+        return
+    }
+	data := struct {
+		FileName string
+		LogOutput string
+	}{
+		logFile,
+		fmt.Sprintf("%q", f),
+	}
+	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 }
 
 // StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
