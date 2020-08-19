@@ -211,7 +211,7 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 				log.Println("Not enough light gathered...")
 			}
 		}
-		log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
+		//log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
 		for i := 0; i < config.Interval; i++ {
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
@@ -250,20 +250,6 @@ func (ls *lightSensor) monitorLight() {
 func init() {
 	//Loading gohtml templates
 	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("templates/*"))
-
-	//Loading config
-	data, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//Resetting Sunrise and Sunset to today
-	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
-	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
 }
 
 func main() {
@@ -275,6 +261,39 @@ func main() {
 	defer f.Close()
 	log.SetOutput(f)
 	log.Println("--------Start of program--------")
+	
+	//Loading config
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		log.Println("Config file does not exist, creating a blank...")
+		config.Sunrise = time.Date(2020, time.August, 19, 10, 0, 0, 0, time.Local)
+		config.Sunset = time.Date(2020, time.August, 19, 18, 0, 0, 0, time.Local)
+		config.SunsetThreshold = 70
+		config.Interval = 60
+		config.LightGoodValue = 9
+		config.LightGoodThreshold = 15
+		config.LightNeutralValue = 11
+		config.LightNeutralThreshold = 20
+		config.LightBadValue = 20
+		config.LightBadThreshold = 5
+		config.AllowedOutliers = 2
+		config.RefreshRate = 30
+		config.EnableMail = false
+		config.MoveHistory = 10
+		config.Notes = "Opmerkingen"
+	} else {
+		data, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = json.Unmarshal(data, &config)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	//Resetting Sunrise and Sunset to today
+	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
+	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
+		
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 	defer func() {
 		log.Println("Closing down...")
@@ -421,8 +440,8 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
-	mu.Unlock()
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
+	mu.Unlock()
 	if err != nil {
 		log.Fatalln(err)
 	}
