@@ -310,7 +310,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate,
 		ls1.data,
-		reverseSS(stats),
+		reverseXSS(stats),
 		config.MoveHistory,
 		len(ls1.data),
 	}
@@ -440,7 +440,7 @@ func logHandler(w http.ResponseWriter, req *http.Request) {
 		LogOutput []string
 	}{
 		logFile,
-		lines,
+		reverseXS(lines),
 	}
 	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
 	if err != nil {
@@ -573,10 +573,18 @@ func strToInt(s string) (int, error) {
 	return i, err
 }
 
-func reverseSS(xxs [][]string) [][]string {
+func reverseXSS(xxs [][]string) [][]string {
 	r := [][]string{}
 	for i, _ := range xxs {
 		r = append(r, xxs[len(xxs)-1-i])
+	}
+	return r
+}
+
+func reverseXS(xs []string) []string {
+	r := []string{}
+	for i, _ := range xs {
+		r = append(r, xs[len(xs)-1-i])
 	}
 	return r
 }
