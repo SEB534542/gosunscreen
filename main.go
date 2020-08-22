@@ -166,6 +166,7 @@ func (ls *lightSensor) GetCurrentLight() []int {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, ls.getLightValue())
 	}
+	log.Println(lightValues)
 	return []int{calcAverage(lightValues...) / lightFactor}
 }
 
