@@ -304,10 +304,11 @@ func main() {
 	go ls1.monitorLight()
 	log.Println("Launching website...")
 	http.HandleFunc("/", mainHandler)
+	http.Handle("/favicon.ico", http.NotFoundhandler())
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
-	log.Fatal(http.ListenAndServe("0.0.0.0:8081", nil))
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
