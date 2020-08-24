@@ -368,10 +368,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func configHandler(w http.ResponseWriter, req *http.Request) {
-	err := req.ParseForm()
-	if err != nil {
-		log.Fatalln(err)
-	}
+	var err error
 	mu.Lock()
 	if req.Method == http.MethodPost {
 		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
