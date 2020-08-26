@@ -13,9 +13,9 @@ import (
 	"net/smtp"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -49,7 +49,7 @@ var config = struct {
 	RefreshRate           int       // Number of seconds the main page should refresh
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
-	Notes				  string    // Field to store comments/notes
+	Notes                 string    // Field to store comments/notes
 }{}
 
 const up string = "up"
@@ -61,7 +61,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFactor = 26
 
-var logFile string = "logfile"  + " " + time.Now().Format("2006-01-02 150405") + ".log"
+var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{
@@ -292,12 +292,12 @@ func main() {
 	// Storing log in a file
 	f, err := os.Create("./logs/" + logFile)
 	if err != nil {
-		fmt.Println("Error", err)
+		log.Panic("Error", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
 	log.Println("--------Start of program--------")
-	
+
 	//Loading config
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		log.Println("Config file does not exist, creating a blank...")
@@ -329,7 +329,7 @@ func main() {
 	
 	//Resetting Sunrise and Sunset to today
 	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
-	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())	
+	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 
 	// Connecting to rpio Pins
@@ -414,73 +414,70 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func configHandler(w http.ResponseWriter, req *http.Request) {
-	err := req.ParseForm()
-	if err != nil {
-		log.Fatalln(err)
-	}
+	var err error
 	mu.Lock()
-	if len(req.PostForm) != 0 {
-		config.Sunrise, err = StoTime(req.PostForm["Sunrise"][0], 0)
+	if req.Method == http.MethodPost {
+		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.Sunset, err = StoTime(req.PostForm["Sunset"][0], 0)
+		config.Sunset, err = StoTime(req.PostFormValue("Sunset"), 0)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.SunsetThreshold, err = strToInt(req.PostForm["SunsetThreshold"][0])
+		config.SunsetThreshold, err = strToInt(req.PostFormValue("SunsetThreshold"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.Interval, err = strToInt(req.PostForm["Interval"][0])
+		config.Interval, err = strToInt(req.PostFormValue("Interval"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightGoodValue, err = strToInt(req.PostForm["LightGoodValue"][0])
+		config.LightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightGoodThreshold, err = strToInt(req.PostForm["LightGoodThreshold"][0])
+		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightNeutralValue, err = strToInt(req.PostForm["LightNeutralValue"][0])
+		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightNeutralThreshold, err = strToInt(req.PostForm["LightNeutralThreshold"][0])
+		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightBadValue, err = strToInt(req.PostForm["LightBadValue"][0])
+		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.LightBadThreshold, err = strToInt(req.PostForm["LightBadThreshold"][0])
+		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.AllowedOutliers, err = strToInt(req.PostForm["AllowedOutliers"][0])
+		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.RefreshRate, err = strToInt(req.PostForm["RefreshRate"][0])
+		config.RefreshRate, err = strToInt(req.PostFormValue("RefreshRate"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if req.PostForm["EnableMail"] == nil {
+		if req.PostFormValue("EnableMail") == "" {
 			config.EnableMail = false
 		} else {
-			config.EnableMail, err = strconv.ParseBool(req.PostForm["EnableMail"][0])
+			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
 			if err != nil {
 				log.Fatalln(err)
 			}
 		}
-		config.MoveHistory, err = strToInt(req.PostForm["MoveHistory"][0])
+		config.MoveHistory, err = strToInt(req.PostFormValue("MoveHistory"))
 		if err != nil {
 			log.Fatalln(err)
 		}
-		config.Notes = req.PostForm["Notes"][0]
+		config.Notes = req.PostFormValue("Notes")
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -494,15 +491,15 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func logHandler(w http.ResponseWriter, req *http.Request) {	
-   f, err := ioutil.ReadFile("./logs/" + logFile)
-   if err != nil {
-        fmt.Println("File reading error", err)
-        return
-    }
-    lines := strings.Split(string(f), "\n")   
+func logHandler(w http.ResponseWriter, req *http.Request) {
+	f, err := ioutil.ReadFile("./logs/" + logFile)
+	if err != nil {
+		fmt.Println("File reading error", err)
+		return
+	}
+	lines := strings.Split(string(f), "\n")
 	data := struct {
-		FileName string
+		FileName  string
 		LogOutput []string
 	}{
 		logFile,
