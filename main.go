@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -49,6 +50,8 @@ var config = struct {
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
 	Notes                 string    // Field to store comments/notes
+	Username string // Username for logging in
+	Password []byte  // Password for logging in
 }{}
 
 const up string = "up"
@@ -62,9 +65,7 @@ const csvFile string = "sunscreen_stats.csv"
 var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
-var fm = template.FuncMap{
-	"fdateHM": hourMinute,
-}
+var fm = template.FuncMap{"fdateHM": hourMinute,}
 
 var ls1 = &lightSensor{
 	pinLight: 23,
@@ -308,7 +309,17 @@ func main() {
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
+	http.HandleFunc("/login", login)
+	http.HandleFunc("/logout", logout)
 	log.Fatal(http.ListenAndServe(":8081", nil))
+}
+
+func login (w http.ResponseWriter, req *http.Request) {
+	return
+}
+
+func logout (w http.ResponseWriter, req *http.Request) {
+	return
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
@@ -370,6 +381,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 func configHandler(w http.ResponseWriter, req *http.Request) {
 	var err error
 	mu.Lock()
+	defer mu.Unlock()
 	if req.Method == http.MethodPost {
 		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
 		if err != nil {
@@ -432,16 +444,25 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			log.Fatalln(err)
 		}
 		config.Notes = req.PostFormValue("Notes")
-		if err != nil {
-			log.Fatalln(err)
+		config.Username = req.PostFormValue("Username")
+		log.Println("Entered password is", req.PostFormValue("Password"))
+		if req.PostFormValue("Password") != "" {
+			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
+			if err != nil {
+				http.Error(w, "Current password is incorrect, password has not been changed", http.StatusForbidden)
+				SaveToJson(config, configFile)
+				log.Println("Updated variables (except for password)")
+				return
+			} else {
+				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
+			}
 		}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
-	mu.Unlock()
 	if err != nil {
-		log.Fatalln(err)
+		log.Panic(err)
 	}
 }
 
@@ -605,3 +626,14 @@ func reverseXS(xs []string) []string {
 	}
 	return r
 }
+/*
+func alreadyLoggedIn(req *http.Request) bool {
+	c, err := req.Cookie("session")
+	if err != nil {
+		return false
+	}
+	un := dbSessions[c.Value]
+	_, ok := dbUsers[un]
+	return ok
+}
+*/
