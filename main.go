@@ -354,7 +354,7 @@ func main() {
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServeTLS(":8081", "cert.pem", "key.pem", nil))
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
