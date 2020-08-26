@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"golang.org/x/crypto/bcrypt"
+	"github.com/satori/go.uuid"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -50,6 +52,8 @@ var config = struct {
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
 	Notes                 string    // Field to store comments/notes
+	Username string // Username for logging in
+	Password []byte  // Password for logging in
 }{}
 
 const up string = "up"
@@ -64,9 +68,8 @@ const lightFactor = 26
 var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
-var fm = template.FuncMap{
-	"fdateHM": hourMinute,
-}
+var fm = template.FuncMap{"fdateHM": hourMinute,}
+var dbSessions = map[string]string{}
 
 var ls1 = &lightSensor{
 	pinLight: rpio.Pin(23),
@@ -300,22 +303,7 @@ func main() {
 
 	//Loading config
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		log.Println("Config file does not exist, creating a blank...")
-		config.Sunrise = time.Date(2020, time.August, 19, 10, 0, 0, 0, time.Local)
-		config.Sunset = time.Date(2020, time.August, 19, 18, 0, 0, 0, time.Local)
-		config.SunsetThreshold = 70
-		config.Interval = 60
-		config.LightGoodValue = 9
-		config.LightGoodThreshold = 15
-		config.LightNeutralValue = 11
-		config.LightNeutralThreshold = 20
-		config.LightBadValue = 20
-		config.LightBadThreshold = 5
-		config.AllowedOutliers = 2
-		config.RefreshRate = 30
-		config.EnableMail = false
-		config.MoveHistory = 10
-		config.Notes = "Opmerkingen"
+		log.Panic("Config file does not exist, shutting down...")
 	} else {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -354,10 +342,74 @@ func main() {
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/logout", logoutHandler)
 	log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
 }
 
+func loginHandler (w http.ResponseWriter, req *http.Request) {
+	if alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+	// process form submission
+	if req.Method == http.MethodPost {
+		u := req.FormValue("Username")
+		p := req.FormValue("Password")
+		// is username correct?
+		if u != config.Username {
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		// does the entered password match the stored password?
+		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
+		if err != nil {
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		// create session
+		sID, _ := uuid.NewV4()
+		c := &http.Cookie{
+			Name:  "session",
+			Value: sID.String(),
+		}
+		http.SetCookie(w, c)
+		dbSessions[c.Value] = config.Username
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+
+	err := tpl.ExecuteTemplate(w, "login.gohtml", nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func logoutHandler (w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+	c, _ := req.Cookie("session")
+	// delete the session
+	delete(dbSessions, c.Value)
+	// remove the cookie
+	c = &http.Cookie{
+		Name:   "session",
+		Value:  "",
+		MaxAge: -1,
+	}
+	http.SetCookie(w, c)
+
+	http.Redirect(w, req, "/login", http.StatusSeeOther)
+}
+
 func mainHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	stats := readCSV(csvFile)
 	mu.Lock()
 	if len(stats) != 0 {
@@ -388,6 +440,11 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func modeHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	mode := req.URL.Path[len("/mode/"):]
 	mu.Lock()
 	switch mode {
@@ -414,8 +471,14 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func configHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	var err error
 	mu.Lock()
+	defer mu.Unlock()
 	if req.Method == http.MethodPost {
 		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
 		if err != nil {
@@ -478,20 +541,34 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			log.Fatalln(err)
 		}
 		config.Notes = req.PostFormValue("Notes")
-		if err != nil {
-			log.Fatalln(err)
+		config.Username = req.PostFormValue("Username")
+		log.Println("Entered password is", req.PostFormValue("Password"))
+		if req.PostFormValue("Password") != "" {
+			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
+			if err != nil {
+				http.Error(w, "Current password is incorrect, password has not been changed", http.StatusForbidden)
+				SaveToJson(config, configFile)
+				log.Println("Updated variables (except for password)")
+				return
+			} else {
+				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
+			}
 		}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
 	err = tpl.ExecuteTemplate(w, "config.gohtml", config)
-	mu.Unlock()
 	if err != nil {
-		log.Fatalln(err)
+		log.Panic(err)
 	}
 }
 
 func logHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	f, err := ioutil.ReadFile("./logs/" + logFile)
 	if err != nil {
 		fmt.Println("File reading error", err)
@@ -650,4 +727,16 @@ func reverseXS(xs []string) []string {
 		r = append(r, xs[len(xs)-1-i])
 	}
 	return r
+}
+
+func alreadyLoggedIn(req *http.Request) bool {
+	c, err := req.Cookie("session")
+	if err != nil {
+		return false
+	}
+	un := dbSessions[c.Value]
+	if un != config.Username {
+		return false
+	}
+	return true
 }
