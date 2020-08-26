@@ -256,7 +256,7 @@ func main() {
 	// Storing log in a file
 	f, err := os.Create("./logs/" + logFile)
 	if err != nil {
-		fmt.Println("Error", err)
+		log.Panic("Error", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
