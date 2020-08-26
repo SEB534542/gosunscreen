@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/satori/go.uuid"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -301,15 +302,60 @@ func main() {
 }
 
 func loginHandler (w http.ResponseWriter, req *http.Request) {
+	if alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+	// process form submission
+	if req.Method == http.MethodPost {
+		u := req.FormValue("Username")
+		p := req.FormValue("Password")
+		// is username correct?
+		if u != config.Username {
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		// does the entered password match the stored password?
+		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
+		if err != nil {
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		// create session
+		sID, _ := uuid.NewV4()
+		c := &http.Cookie{
+			Name:  "session",
+			Value: sID.String(),
+		}
+		http.SetCookie(w, c)
+		dbSessions[c.Value] = config.Username
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+
 	err := tpl.ExecuteTemplate(w, "login.gohtml", nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	return
 }
 
 func logoutHandler (w http.ResponseWriter, req *http.Request) {
-	return
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+		return
+	}
+	c, _ := req.Cookie("session")
+	// delete the session
+	delete(dbSessions, c.Value)
+	// remove the cookie
+	c = &http.Cookie{
+		Name:   "session",
+		Value:  "",
+		MaxAge: -1,
+	}
+	http.SetCookie(w, c)
+
+	http.Redirect(w, req, "/login", http.StatusSeeOther)
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
