@@ -66,6 +66,7 @@ var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + 
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{"fdateHM": hourMinute,}
+var dbSessions = map[string]string{}
 
 var ls1 = &lightSensor{
 	pinLight: 23,
@@ -265,22 +266,7 @@ func main() {
 
 	//Loading config
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		log.Println("Config file does not exist, creating a blank...")
-		config.Sunrise = time.Date(2020, time.August, 19, 10, 0, 0, 0, time.Local)
-		config.Sunset = time.Date(2020, time.August, 19, 18, 0, 0, 0, time.Local)
-		config.SunsetThreshold = 70
-		config.Interval = 60
-		config.LightGoodValue = 9
-		config.LightGoodThreshold = 15
-		config.LightNeutralValue = 11
-		config.LightNeutralThreshold = 20
-		config.LightBadValue = 20
-		config.LightBadThreshold = 5
-		config.AllowedOutliers = 2
-		config.RefreshRate = 30
-		config.EnableMail = false
-		config.MoveHistory = 10
-		config.Notes = "Opmerkingen"
+		log.Panic("Config file does not exist, shutting down...")
 	} else {
 		data, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -626,14 +612,15 @@ func reverseXS(xs []string) []string {
 	}
 	return r
 }
-/*
+
 func alreadyLoggedIn(req *http.Request) bool {
 	c, err := req.Cookie("session")
 	if err != nil {
 		return false
 	}
 	un := dbSessions[c.Value]
-	_, ok := dbUsers[un]
-	return ok
+	if un != config.Username {
+		return false
+	}
+	return true
 }
-*/
