@@ -350,7 +350,7 @@ func main() {
 	go ls1.monitorLight()
 	log.Println("Launching website...")
 	http.HandleFunc("/", mainHandler)
-	http.Handle("/favicon.ico", http.NotFoundhandler())
+	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
