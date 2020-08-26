@@ -295,20 +295,29 @@ func main() {
 	http.HandleFunc("/mode/", modeHandler)
 	http.HandleFunc("/config/", configHandler)
 	http.HandleFunc("/log/", logHandler)
-	http.HandleFunc("/login", login)
-	http.HandleFunc("/logout", logout)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/logout", logoutHandler)
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
-func login (w http.ResponseWriter, req *http.Request) {
+func loginHandler (w http.ResponseWriter, req *http.Request) {
+	err := tpl.ExecuteTemplate(w, "login.gohtml", nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	return
 }
 
-func logout (w http.ResponseWriter, req *http.Request) {
+func logoutHandler (w http.ResponseWriter, req *http.Request) {
 	return
 }
 
 func mainHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	stats := readCSV(csvFile)
 	mu.Lock()
 	if len(stats) != 0 {
@@ -339,6 +348,11 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func modeHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	mode := req.URL.Path[len("/mode/"):]
 	mu.Lock()
 	switch mode {
@@ -365,6 +379,11 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func configHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
@@ -453,6 +472,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func logHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	
 	f, err := ioutil.ReadFile("./logs/" + logFile)
 	if err != nil {
 		fmt.Println("File reading error", err)
