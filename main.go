@@ -169,7 +169,6 @@ func (ls *lightSensor) GetCurrentLight() []int {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, ls.getLightValue())
 	}
-	log.Println(lightValues)
 	return []int{calcAverage(lightValues...) / lightFactor}
 }
 
@@ -368,6 +367,7 @@ func loginHandler (w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		// create session
+		log.Println("User logged in...")
 		sID, _ := uuid.NewV4()
 		c := &http.Cookie{
 			Name:  "session",
@@ -542,7 +542,6 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		config.Notes = req.PostFormValue("Notes")
 		config.Username = req.PostFormValue("Username")
-		log.Println("Entered password is", req.PostFormValue("Password"))
 		if req.PostFormValue("Password") != "" {
 			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
 			if err != nil {
