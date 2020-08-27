@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/stianeikeland/go-rpio"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -18,6 +17,7 @@ import (
 	"time"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/satori/go.uuid"
+	//"github.com/stianeikeland/go-rpio"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
@@ -26,13 +26,13 @@ type Sunscreen struct {
 	Position string   // Current position of Sunscreen
 	secDown  int      // Seconds to move Sunscreen down
 	secUp    int      // Seconds to move Sunscreen up<<<<<<< HEAD
-	pinDown  rpio.Pin // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin // GPIO pin for moving sunscreen up
+	pinDown  int      // GPIO pin for moving sunscreen down
+	pinUp    int      // GPIO pin for moving sunscreen up
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type lightSensor struct {
-	pinLight rpio.Pin // pin for retrieving light value
+	pinLight int      // pin for retrieving light value
 	data     []int    // collected light values
 }
 
@@ -72,7 +72,7 @@ var fm = template.FuncMap{"fdateHM": hourMinute,}
 var dbSessions = map[string]string{}
 
 var ls1 = &lightSensor{
-	pinLight: rpio.Pin(23),
+	pinLight: 23,
 	data:     []int{},
 }
 var s1 = &Sunscreen{
@@ -80,8 +80,8 @@ var s1 = &Sunscreen{
 	Position: up,
 	secDown:  17,
 	secUp:    20,
-	pinDown:  rpio.Pin(21),
-	pinUp:    rpio.Pin(20),
+	pinDown:  21,
+	pinUp:    20,
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -89,19 +89,19 @@ func (s *Sunscreen) Move() {
 	old := s.Position
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
-		s.pinUp.Low()
+		//s.pinUp.Low()
 		for i := 0; i <= s.secUp; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinUp.High()
+		//s.pinUp.High()
 		s.Position = up
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
-		s.pinDown.Low()
+		//s.pinDown.Low()
 		for i := 0; i <= s.secDown; i++ {
 			time.Sleep(time.Second)
 		}
-		s.pinDown.High()
+		//s.pinDown.High()
 		s.Position = down
 	}
 	new := s.Position
@@ -165,29 +165,7 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 
 // GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
 func (ls *lightSensor) GetCurrentLight() []int {
-	lightValues := []int{}
-	for i := 0; i < 10; i++ {
-		lightValues = append(lightValues, ls.getLightValue())
-	}
-	return []int{calcAverage(lightValues...) / lightFactor}
-}
-
-func (ls *lightSensor) getLightValue() int {
-	count := 0
-	// Output on the pin for 0.1 seconds
-	ls.pinLight.Output()
-	ls.pinLight.Low()
-	time.Sleep(100 * time.Millisecond)
-
-	// Change the pin back to input
-	ls.pinLight.Input()
-
-	// Count until the pin goes high
-	for ls.pinLight.Read() == rpio.Low {
-		count++
-	}
-	// log.Println("Current light value is:", count)
-	return count
+	return []int{5}
 }
 
 func calcAverage(xi ...int) int {
@@ -319,14 +297,6 @@ func main() {
 	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
 	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
 
-	// Connecting to rpio Pins
-	rpio.Open()
-	defer rpio.Close()
-	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
-		pin.Output()
-		pin.High()
-	}
-	
 	defer func() {
 		log.Println("Closing down...")
 		mu.Lock()
@@ -343,7 +313,7 @@ func main() {
 	http.HandleFunc("/log/", logHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
-	log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
 func loginHandler (w http.ResponseWriter, req *http.Request) {
