@@ -63,7 +63,7 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
-const lightFactor = 26
+const lightFactor = 17
 
 var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
