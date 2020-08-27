@@ -343,7 +343,7 @@ func main() {
 	http.HandleFunc("/log/", logHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
 }
 
 func loginHandler (w http.ResponseWriter, req *http.Request) {
