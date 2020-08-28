@@ -367,7 +367,7 @@ func loginHandler (w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		// create session
-		log.Println("User logged in...")
+		log.Printf("User (%v) logged in...", GetIP(req))
 		sID, _ := uuid.NewV4()
 		c := &http.Cookie{
 			Name:  "session",
@@ -738,4 +738,14 @@ func alreadyLoggedIn(req *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// GetIP gets a requests IP address by reading off the forwarded-for
+// header (for proxies) and falls back to use the remote address.
+func GetIP(req *http.Request) string {
+	forwarded := req.Header.Get("X-FORWARDED-FOR")
+	if forwarded != "" {
+		return forwarded
+	}
+	return req.RemoteAddr
 }
