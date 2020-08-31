@@ -32,7 +32,7 @@ type Sunscreen struct {
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
-type lightSensor struct {
+type LightSensor struct {
 	pinLight rpio.Pin // pin for retrieving light value
 	data     []int    // collected light values
 }
@@ -72,7 +72,7 @@ var mu sync.Mutex
 var fm = template.FuncMap{"fdateHM": hourMinute}
 var dbSessions = map[string]string{}
 
-var ls1 = &lightSensor{
+var ls1 = &LightSensor{
 	pinLight: rpio.Pin(23),
 	data:     []int{},
 }
@@ -165,7 +165,7 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 }
 
 // GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
-func (ls *lightSensor) GetCurrentLight() []int {
+func (ls *LightSensor) GetCurrentLight() []int {
 	lightValues := []int{}
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, ls.getLightValue())
@@ -173,7 +173,7 @@ func (ls *lightSensor) GetCurrentLight() []int {
 	return []int{calcAverage(lightValues...) / lightFactor}
 }
 
-func (ls *lightSensor) getLightValue() int {
+func (ls *LightSensor) getLightValue() int {
 	count := 0
 	// Output on the pin for 0.1 seconds
 	ls.pinLight.Output()
