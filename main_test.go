@@ -1,4 +1,4 @@
-package gosunscreen
+package main
 
 import (
 	"testing"

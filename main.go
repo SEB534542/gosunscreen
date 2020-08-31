@@ -1,5 +1,5 @@
 // Package gosunscreen monitors light and moves the Sunscreen accordingly through GPIO
-package gosunscreen
+package main
 
 import (
 	"encoding/csv"
@@ -328,12 +328,14 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		p := req.FormValue("Password")
 		// is username correct?
 		if u != config.Username {
+			log.Printf("%v entered incorrect username...", GetIP(req))
 			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 			return
 		}
 		// does the entered password match the stored password?
 		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
 		if err != nil {
+			log.Printf("%v entered incorrect password...", GetIP(req))
 			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 			return
 		}
