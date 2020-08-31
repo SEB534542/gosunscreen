@@ -1,5 +1,5 @@
 // Package gosunscreen monitors light and moves the Sunscreen accordingly through GPIO
-package main
+package gosunscreen
 
 import (
 	"encoding/csv"
@@ -15,25 +15,26 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"golang.org/x/crypto/bcrypt"
+
 	"github.com/satori/go.uuid"
+	"golang.org/x/crypto/bcrypt"
 	//"github.com/stianeikeland/go-rpio"
 )
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	Mode     string   // Mode of Sunscreen auto or manual
-	Position string   // Current position of Sunscreen
-	secDown  int      // Seconds to move Sunscreen down
-	secUp    int      // Seconds to move Sunscreen up<<<<<<< HEAD
-	pinDown  int      // GPIO pin for moving sunscreen down
-	pinUp    int      // GPIO pin for moving sunscreen up
+	Mode     string // Mode of Sunscreen auto or manual
+	Position string // Current position of Sunscreen
+	secDown  int    // Seconds to move Sunscreen down
+	secUp    int    // Seconds to move Sunscreen up<<<<<<< HEAD
+	pinDown  int    // GPIO pin for moving sunscreen down
+	pinUp    int    // GPIO pin for moving sunscreen up
 }
 
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
-type lightSensor struct {
-	pinLight int      // pin for retrieving light value
-	data     []int    // collected light values
+type LightSensor struct {
+	pinLight int   // pin for retrieving light value
+	data     []int // collected light values
 }
 
 var config = struct {
@@ -52,8 +53,8 @@ var config = struct {
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
 	Notes                 string    // Field to store comments/notes
-	Username string // Username for logging in
-	Password []byte  // Password for logging in
+	Username              string    // Username for logging in
+	Password              []byte    // Password for logging in
 }{}
 
 const up string = "up"
@@ -68,10 +69,10 @@ const lightFactor = 15
 var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
-var fm = template.FuncMap{"fdateHM": hourMinute,}
+var fm = template.FuncMap{"fdateHM": hourMinute}
 var dbSessions = map[string]string{}
 
-var ls1 = &lightSensor{
+var ls1 = &LightSensor{
 	pinLight: 23,
 	data:     []int{},
 }
@@ -164,7 +165,7 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 }
 
 // GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
-func (ls *lightSensor) GetCurrentLight() []int {
+func (ls *LightSensor) GetCurrentLight() []int {
 	return []int{5}
 }
 
@@ -176,7 +177,7 @@ func calcAverage(xi ...int) int {
 	return total / len(xi)
 }
 
-func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
+func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 	for {
 		mu.Lock()
 		if s.Mode != auto {
@@ -242,7 +243,7 @@ func (s *Sunscreen) autoSunscreen(ls *lightSensor) {
 	}
 }
 
-func (ls *lightSensor) monitorLight() {
+func (ls *LightSensor) monitorLight() {
 	for {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
@@ -291,7 +292,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	
+
 	//Resetting Sunrise and Sunset to today
 	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
 	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
@@ -303,7 +304,7 @@ func main() {
 		s1.Up()
 		mu.Unlock()
 	}()
-	
+
 	go ls1.monitorLight()
 	log.Println("Launching website...")
 	http.HandleFunc("/", mainHandler)
@@ -316,7 +317,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
-func loginHandler (w http.ResponseWriter, req *http.Request) {
+func loginHandler(w http.ResponseWriter, req *http.Request) {
 	if alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
@@ -355,7 +356,7 @@ func loginHandler (w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func logoutHandler (w http.ResponseWriter, req *http.Request) {
+func logoutHandler(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
@@ -379,7 +380,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
-	
+
 	stats := readCSV(csvFile)
 	mu.Lock()
 	if len(stats) != 0 {
@@ -414,7 +415,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
-	
+
 	mode := req.URL.Path[len("/mode/"):]
 	mu.Lock()
 	switch mode {
@@ -445,7 +446,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
-	
+
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
@@ -537,7 +538,7 @@ func logHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
-	
+
 	f, err := ioutil.ReadFile("./logs/" + logFile)
 	if err != nil {
 		fmt.Println("File reading error", err)
