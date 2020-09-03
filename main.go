@@ -130,7 +130,7 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 	counter := 0
 	switch s.Position {
 	case up:
-		log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
+		//log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
 		for _, v := range lightData[:(config.LightGoodThreshold + config.AllowedOutliers)] {
 			if v <= config.LightGoodValue {
 				counter++
@@ -141,7 +141,7 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 			return
 		}
 	case down:
-		log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
+		//log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
 		for _, v := range lightData[:(config.LightBadThreshold + config.AllowedOutliers)] {
 			if v >= config.LightBadValue {
 				counter++
