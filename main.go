@@ -271,10 +271,9 @@ func init() {
 }
 
 func main() {
-	// Storing log in a file
-	f, err := os.Create("./logs/" + logFile)
+	f, err := os.OpenFile("./logs/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Panic("Error", err)
+		log.Panic("Error opening file:", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
