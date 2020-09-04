@@ -52,6 +52,7 @@ var config = struct {
 	RefreshRate           int       // Number of seconds the main page should refresh
 	EnableMail            bool      // Enable mail functionality
 	MoveHistory           int       // Number of sunscreen movements to be shown
+	LogRecords            int       // Number of log records that are shown
 	Notes                 string    // Field to store comments/notes
 	Username              string    // Username for logging in
 	Password              []byte    // Password for logging in
@@ -66,7 +67,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFactor = 15
 
-var logFile string = "logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
+var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{"fdateHM": hourMinute}
@@ -292,10 +293,9 @@ func init() {
 }
 
 func main() {
-	// Storing log in a file
-	f, err := os.Create("./logs/" + logFile)
+	f, err := os.OpenFile("./logs/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Panic("Error", err)
+		log.Panic("Error opening file:", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
@@ -543,6 +543,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		config.LogRecords, err = strToInt(req.PostFormValue("LogRecords"))
+		if err != nil {
+			log.Fatalln(err)
+		}
 		config.Notes = req.PostFormValue("Notes")
 		config.Username = req.PostFormValue("Username")
 		if req.PostFormValue("Password") != "" {
@@ -577,12 +581,16 @@ func logHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	lines := strings.Split(string(f), "\n")
+	var max = config.LogRecords
+	if len(lines) < max {
+		max = len(lines)
+	}
 	data := struct {
 		FileName  string
 		LogOutput []string
 	}{
 		logFile,
-		reverseXS(lines),
+		reverseXS(lines)[:max],
 	}
 	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
 	if err != nil {
