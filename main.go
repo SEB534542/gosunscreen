@@ -267,7 +267,7 @@ func (ls *LightSensor) monitorLight() {
 
 func init() {
 	//Loading gohtml templates
-	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("templates/*"))
+	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("./templates/*"))
 }
 
 func main() {
@@ -341,7 +341,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		// create session
 		log.Printf("User (%v) logged in...", GetIP(req))
-		sID, _ := uuid.NewV4()
+		sID := uuid.NewV4()
 		c := &http.Cookie{
 			Name:  "session",
 			Value: sID.String(),
