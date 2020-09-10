@@ -712,7 +712,7 @@ func reverseXS(xs []string) []string {
 func alreadyLoggedIn(req *http.Request) bool {
 	c, err := req.Cookie("session")
 	if err != nil {
-		log.Println("No cookie in browser")
+		log.Println("No cookie in browser:", err)
 		return false
 	}
 	un := dbSessions[c.Value]
