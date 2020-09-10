@@ -11,6 +11,23 @@
 <p><a href="/">Click here to go back to home</a></p>
 
 <form method="POST">
+  <table>
+      <tr>
+        <td></td><td>Good</td><td>Neutral</td><td>Bad</td>
+      </tr>
+      <tr>
+        <td>Value</td>
+        <td><input type="number" name="LightGoodValue" value="{{.LightGoodValue}}" required></td>
+        <td><input type="number" name="LightNeutralValue" value="{{.LightNeutralValue}}" required></td>
+        <td><input type="number" name="LightBadValue" value="{{.LightBadValue}}" required></td>
+      </tr> 
+      <tr>
+        <td>Threshold</td>
+        <td><input type="number" name="LightGoodThreshold" value="{{.LightGoodThreshold}}" required></td>
+        <td><input type="number" name="LightNeutralThreshold" value="{{.LightNeutralThreshold}}" required></td>
+        <td><input type="number" name="LightBadThreshold" value="{{.LightBadThreshold}}" required></td>
+  </table>
+  <br>
 	<table>
 		<tr>
 			<td><label for="Sunrise">Sunrise (hh:mm)</label></td>
@@ -23,38 +40,14 @@
 		<tr>
 			<td><label for="SunsetThreshold">Sunset Threshold (Number of minutes)</label></td>
 			<td><input type="number" name="SunsetThreshold" value="{{.SunsetThreshold}}" required></td>
-		</tr>	
-		<tr>
-			<td><label for="Interval">Interval in seconds</label></td>
-			<td><input type="number" name="Interval" value="{{.Interval}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightGoodValue">LightGoodValue</label></td>
-			<td><input type="number" name="LightGoodValue" value="{{.LightGoodValue}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightGoodThreshold">LightGoodThreshold (Number of times)</label></td>
-			<td><input type="number" name="LightGoodThreshold" value="{{.LightGoodThreshold}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightNeutralValue">LightNeutralValue</label></td>
-			<td><input type="number" name="LightNeutralValue" value="{{.LightNeutralValue}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightNeutralThreshold">LightNeutralThreshold</label></td>
-			<td><input type="number" name="LightNeutralThreshold" value="{{.LightNeutralThreshold}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightBadValue">LightBadValue</label></td>
-			<td><input type="number" name="LightBadValue" value="{{.LightBadValue}}" required></td>
-		</tr>
-		<tr>
-			<td><label for="LightBadThreshold">LightBadThreshold (Number of times)</label></td>
-			<td><input type="number" name="LightBadThreshold" value="{{.LightBadThreshold}}" required></td>
 		</tr>
 		<tr>
 			<td><label for="AllowedOutliers">AllowedOutliers (Number of times)</label></td>
 			<td><input type="number" name="AllowedOutliers" value="{{.AllowedOutliers}}" required></td>
+		</tr>
+    <tr>
+			<td><label for="Interval">Interval in seconds</label></td>
+			<td><input type="number" name="Interval" value="{{.Interval}}" required></td>
 		</tr>
 		<tr>
 			<td><label for="RefreshRate">RefreshRate in seconds</label></td>
