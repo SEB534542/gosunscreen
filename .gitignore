@@ -55,3 +55,4 @@ builds/**/images/*
 go-log.txt
 sunscreen_stats.csv
 *.log
+main
