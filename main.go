@@ -346,6 +346,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 			Name:  "session",
 			Value: sID.String(),
 		}
+		log.Println("Cookie:", c.Value)
 		http.SetCookie(w, c)
 		dbSessions[c.Value] = config.Username
 		http.Redirect(w, req, "/", http.StatusSeeOther)
