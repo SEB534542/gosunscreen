@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Light Measurements</title>
+</head>
+<body>
+
+<h1>Light Measurements</h1>
+
+<p><a href="/">Click here to go back to home</a></p>
+
+<table border="0" CELLSPACING=5>
+<tr><td><b>Datetime</b></td><td><b>Light</b></td></tr>
+{{range.Stats}}
+	<tr>
+	{{range .}}
+		<td>{{.}}</td>
+	{{end}}
+	</tr>
+{{end}}
+</table>
+</body>
+</html>
