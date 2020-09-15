@@ -65,6 +65,7 @@ const auto string = "auto"
 const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
+const lightFile string = "light.csv"
 const lightFactor = 15
 
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
@@ -247,8 +248,8 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 			//if there is enough light gathered in ls.data, evaluate position
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
 				s.evalPosition(ls.data)
-			} else {
-				log.Println("Not enough light gathered...")
+			} else if len(ls.data) <= 2 {
+				log.Println("Not enough light gathered...", len(ls.data))
 			}
 		}
 		//log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
@@ -271,6 +272,7 @@ func (ls *LightSensor) monitorLight() {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
+			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
@@ -344,6 +346,7 @@ func main() {
 	http.HandleFunc("/log/", logHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
+	http.HandleFunc("/light", lightHandler)
 	log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
 }
 
@@ -438,6 +441,28 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func lightHandler(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	mu.Lock()
+	stats := readCSV(lightFile)
+	if len(stats) != 0 {
+		stats = stats[MaxIntSlice(0, len(stats)-config.LogRecords):]
+	}
+	data := struct {
+		Stats [][]string
+	}{
+		reverseXSS(stats),
+	}
+	mu.Unlock()
+	err := tpl.ExecuteTemplate(w, "light.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
 	}

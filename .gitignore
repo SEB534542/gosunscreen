@@ -53,6 +53,8 @@ builds/**/images/*
 *.xxjson
 
 go-log.txt
-sunscreen_stats.csv
 *.log
 main
+*.log
+*.csv
+*.json
