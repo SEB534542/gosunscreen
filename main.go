@@ -56,6 +56,7 @@ var config = struct {
 	Notes                 string    // Field to store comments/notes
 	Username              string    // Username for logging in
 	Password              []byte    // Password for logging in
+	IpWhitelist           []string  // Whitelisted IPs
 }{}
 
 const up string = "up"
@@ -71,7 +72,7 @@ const lightFactor = 15
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
-var fm = template.FuncMap{"fdateHM": hourMinute}
+var fm = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
 var dbSessions = map[string]string{}
 
 var ls1 = &LightSensor{
@@ -325,25 +326,22 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
 	}
-	// process form submission
-	if req.Method == http.MethodPost {
-		u := req.FormValue("Username")
-		p := req.FormValue("Password")
-		// is username correct?
-		if u != config.Username {
-			log.Printf("%v entered incorrect username...", GetIP(req))
-			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
-			return
+
+	ip := GetIP(req)
+
+	// If IP is on whitelist, return true, else false
+	knownIp := func(ip string) bool {
+		for _, v := range config.IpWhitelist {
+			if ip == v {
+				return true
+			}
 		}
-		// does the entered password match the stored password?
-		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
-		if err != nil {
-			log.Printf("%v entered incorrect password...", GetIP(req))
-			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
-			return
-		}
+		return false
+	}
+
+	createSession := func() {
 		// create session
-		log.Printf("User (%v) logged in...", GetIP(req))
+		log.Printf("User (%v) logged in...", ip)
 		sID := uuid.NewV4()
 		c := &http.Cookie{
 			Name:  "session",
@@ -353,6 +351,31 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		http.SetCookie(w, c)
 		dbSessions[c.Value] = config.Username
 		http.Redirect(w, req, "/", http.StatusSeeOther)
+	}
+
+	if knownIp(ip) {
+		createSession()
+		return
+	}
+
+	// process form submission
+	if req.Method == http.MethodPost {
+		u := req.FormValue("Username")
+		p := req.FormValue("Password")
+
+		if u != config.Username {
+			log.Printf("%v entered incorrect username...", ip)
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		// does the entered password match the stored password?
+		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
+		if err != nil {
+			log.Printf("%v entered incorrect password...", ip)
+			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			return
+		}
+		createSession()
 		return
 	}
 
@@ -556,6 +579,13 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
 			}
 		}
+		config.IpWhitelist = func(s string) []string {
+			xs := strings.Split(s, ",")
+			for i, v := range xs {
+				xs[i] = strings.Trim(v, " ")
+			}
+			return xs
+		}(req.PostFormValue("IpWhitelist"))
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
@@ -632,6 +662,10 @@ func SaveToJson(i interface{}, fileName string) {
 	if err != nil {
 		log.Fatal("Error", err)
 	}
+}
+
+func SliceToString(xs []string) string {
+	return strings.Join(xs, ",")
 }
 
 func hourMinute(t time.Time) string {

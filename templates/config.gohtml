@@ -81,6 +81,10 @@
 			<td><label for="Password">Password</label></td>
 			<td><input type="password" name="Password"></td>
 		</tr>		
+    <tr>
+			<td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
+			<td><input type="text" name="IpWhitelist" value="{{fsliceString .IpWhitelist}}"></td>
+		</tr>	
 	</table>
 	<br>
 	<input type="submit" value="Save">
