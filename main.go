@@ -329,8 +329,14 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 
 	ip := GetIP(req)
 
-	// If IP is on whitelist, return true, else false
+	// Check if IP is on whitelist (true)
 	knownIp := func(ip string) bool {
+		for i, v := range ip {
+			if v == 58 {
+				ip = ip[:i]
+				break
+			}
+		}
 		for _, v := range config.IpWhitelist {
 			if ip == v {
 				return true
@@ -347,7 +353,6 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 			Name:  "session",
 			Value: sID.String(),
 		}
-		log.Println("Cookie:", c.Value)
 		http.SetCookie(w, c)
 		dbSessions[c.Value] = config.Username
 		http.Redirect(w, req, "/", http.StatusSeeOther)
@@ -772,12 +777,12 @@ func reverseXS(xs []string) []string {
 func alreadyLoggedIn(req *http.Request) bool {
 	c, err := req.Cookie("session")
 	if err != nil {
-		log.Printf("No cookie in browser: %v (%s)", err, GetIP(req))
+		// Error retrieving cookie
 		return false
 	}
 	un := dbSessions[c.Value]
 	if un != config.Username {
-		log.Printf("Unknown cookie: %v (%s)", c.Value, GetIP(req))
+		// Unknown cookie
 		return false
 	}
 	return true
