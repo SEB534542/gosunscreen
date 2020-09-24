@@ -326,6 +326,11 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
 	}
+
+	ip := GetIP(req)
+
+	// if knownIp(ip)
+
 	// TODO: check if current ip exists in config.IpWhitelist
 	// https://play.golang.org/p/l0bVZIQQsXZ
 
@@ -335,7 +340,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		p := req.FormValue("Password")
 		// is username correct?
 		if u != config.Username {
-			log.Printf("%v entered incorrect username...", GetIP(req))
+			log.Printf("%v entered incorrect username...", ip)
 			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 			return
 		}
