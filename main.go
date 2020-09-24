@@ -329,8 +329,9 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 
 	ip := GetIP(req)
 
+	// If IP is on whitelist, return true, else false
 	knownIp := func(ip string) bool {
-		for i, v := range config.IpWhitelist {
+		for _, v := range config.IpWhitelist {
 			if ip == v {
 				return true
 			}
@@ -338,9 +339,24 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		return false
 	}
 
-	// TODO: correct routing
-	fmt.Println(knownIp(ip))
-	// https://play.golang.org/p/l0bVZIQQsXZ
+	createSession := func() {
+		// create session
+		log.Printf("User (%v) logged in...", ip)
+		sID := uuid.NewV4()
+		c := &http.Cookie{
+			Name:  "session",
+			Value: sID.String(),
+		}
+		log.Println("Cookie:", c.Value)
+		http.SetCookie(w, c)
+		dbSessions[c.Value] = config.Username
+		http.Redirect(w, req, "/", http.StatusSeeOther)
+	}
+
+	if knownIp(ip) {
+		createSession()
+		return
+	}
 
 	// process form submission
 	if req.Method == http.MethodPost {
@@ -355,21 +371,11 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		// does the entered password match the stored password?
 		err := bcrypt.CompareHashAndPassword(config.Password, []byte(p))
 		if err != nil {
-			log.Printf("%v entered incorrect password...", GetIP(req))
+			log.Printf("%v entered incorrect password...", ip)
 			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 			return
 		}
-		// create session
-		log.Printf("User (%v) logged in...", GetIP(req))
-		sID := uuid.NewV4()
-		c := &http.Cookie{
-			Name:  "session",
-			Value: sID.String(),
-		}
-		log.Println("Cookie:", c.Value)
-		http.SetCookie(w, c)
-		dbSessions[c.Value] = config.Username
-		http.Redirect(w, req, "/", http.StatusSeeOther)
+		createSession()
 		return
 	}
 
