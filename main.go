@@ -56,6 +56,7 @@ var config = struct {
 	Notes                 string    // Field to store comments/notes
 	Username              string    // Username for logging in
 	Password              []byte    // Password for logging in
+	IpWhitelist           []string  // Whitelisted IPs
 }{}
 
 const up string = "up"
@@ -556,6 +557,10 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
 			}
 		}
+		// config.IpWhitelist = func
+		// https://play.golang.org/p/sx-rNUK1rbq
+		// TODO: transform []string to string for config.gohtml
+
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
