@@ -52,7 +52,7 @@ builds/**/images/*
 *.pem
 *.xxjson
 
-go-log.txt
+*.txt
 *.log
 main
 *.log
