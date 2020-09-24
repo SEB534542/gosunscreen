@@ -72,7 +72,7 @@ const lightFactor = 15
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
-var fm = template.FuncMap{"fdateHM": hourMinute}
+var fm = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
 var dbSessions = map[string]string{}
 
 var ls1 = &LightSensor{
@@ -326,6 +326,9 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
 	}
+	// TODO: check if current ip exists in config.IpWhitelist
+	// https://play.golang.org/p/l0bVZIQQsXZ
+
 	// process form submission
 	if req.Method == http.MethodPost {
 		u := req.FormValue("Username")
@@ -557,10 +560,13 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
 			}
 		}
-		// config.IpWhitelist = func
-		// https://play.golang.org/p/sx-rNUK1rbq
-		// TODO: transform []string to string for config.gohtml
-
+		config.IpWhitelist = func(s string) []string {
+			xs := strings.Split(s, ",")
+			for i, v := range xs {
+				xs[i] = strings.Trim(v, " ")
+			}
+			return xs
+		}(req.PostFormValue("IpWhitelist"))
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}
@@ -637,6 +643,10 @@ func SaveToJson(i interface{}, fileName string) {
 	if err != nil {
 		log.Fatal("Error", err)
 	}
+}
+
+func SliceToString(xs []string) string {
+	return strings.Join(xs, ",")
 }
 
 func hourMinute(t time.Time) string {
