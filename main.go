@@ -173,7 +173,11 @@ func (ls *LightSensor) GetCurrentLight() []int {
 	for i := 0; i < 10; i++ {
 		lightValues = append(lightValues, ls.getLightValue())
 	}
-	return []int{calcAverage(lightValues...) / lightFactor}
+	x := []int{calcAverage(lightValues...) / lightFactor}
+	if x == 0 {
+		return 987
+	}
+	return x
 }
 
 func (ls *LightSensor) getLightValue() int {

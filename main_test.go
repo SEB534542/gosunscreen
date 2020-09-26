@@ -59,8 +59,8 @@ func TestMove(t *testing.T) {
 	}
 }
 
-func TestautoSunscreen(){
-	config : = struct {
+func TestautoSunscreen() {
+	config := struct {
 		Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
 		Sunset                time.Time // Time after which Sunscreen no can shine on the Sunscreen area
 		SunsetThreshold       int       // Minutes before sunset that Sunscreen no longer should go down
@@ -76,19 +76,19 @@ func TestautoSunscreen(){
 		EnableMail            bool      // Enable mail functionality
 		MoveHistory           int       // Number of sunscreen movements to be shown
 	}{
-		Sunrise: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 9, 0, time.Now().Second(), time.Now().Nanosecond(), time.Local)
-		Sunset: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 23, 0, time.Now().Second(), time.Now().Nanosecond(), time.Local)
-		SunsetThreshold: 70
-		Interval: 1
-		LightGoodValue: 9
-		LightGoodThreshold: 3
-		LightNeutralValue: 11
-		LightNeutralThreshold: 3
-		LightBadValue: 28
-		LightBadThreshold: 3
-		AllowedOutliers: 2
-		RefreshRate: 10
-		EnableMail: false
-		MoveHistory: 0
+		Sunrise:               time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 9, 0, time.Now().Second(), time.Now().Nanosecond(), time.Local),
+		Sunset:                time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 23, 0, time.Now().Second(), time.Now().Nanosecond(), time.Local),
+		SunsetThreshold:       70,
+		Interval:              1,
+		LightGoodValue:        9,
+		LightGoodThreshold:    3,
+		LightNeutralValue:     11,
+		LightNeutralThreshold: 3,
+		LightBadValue:         28,
+		LightBadThreshold:     3,
+		AllowedOutliers:       2,
+		RefreshRate:           10,
+		EnableMail:            false,
+		MoveHistory:           0,
 	}
 }
