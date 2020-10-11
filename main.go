@@ -57,6 +57,7 @@ var config = struct {
 	Username              string    // Username for logging in
 	Password              []byte    // Password for logging in
 	IpWhitelist           []string  // Whitelisted IPs
+	LightFactor           int       // Factor for correcting the measured analog light value
 }{}
 
 const up string = "up"
@@ -67,7 +68,6 @@ const manual string = "manual"
 const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFile string = "light.csv"
-const lightFactor = 15
 const port = ":8443"
 
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
@@ -178,7 +178,7 @@ func (ls *LightSensor) GetCurrentLight() []int {
 		}
 		lightValues = append(lightValues, lightValue)
 	}
-	x := []int{calcAverage(lightValues...) / lightFactor}
+	x := []int{calcAverage(lightValues...) / config.LightFactor}
 	if x[0] == 0 {
 		return []int{987}
 	}
@@ -648,6 +648,11 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 			}
 			return xs
 		}(req.PostFormValue("IpWhitelist"))
+
+		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
+		if err != nil {
+			log.Fatalln(err)
+		}
 		SaveToJson(config, configFile)
 		log.Println("Updated variables")
 	}

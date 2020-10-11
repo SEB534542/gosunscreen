@@ -45,7 +45,7 @@
 			<td><label for="AllowedOutliers">AllowedOutliers (Number of times)</label></td>
 			<td><input type="number" name="AllowedOutliers" value="{{.AllowedOutliers}}" required></td>
 		</tr>
-    <tr>
+    		<tr>
 			<td><label for="Interval">Interval in seconds</label></td>
 			<td><input type="number" name="Interval" value="{{.Interval}}" required></td>
 		</tr>
@@ -61,7 +61,7 @@
 			<td><label for="MoveHistory">Number of historical Movements</label></td>
 			<td><input type="number" name="MoveHistory" value="{{.MoveHistory}}" required></td>
 		</tr>
-    <tr>
+    		<tr>
 			<td><label for="LogRecords">Number Log records shown</label></td>
 			<td><input type="number" name="LogRecords" value="{{.LogRecords}}" required></td>
 		</tr>
@@ -81,9 +81,13 @@
 			<td><label for="Password">Password</label></td>
 			<td><input type="password" name="Password"></td>
 		</tr>		
-    <tr>
+    		<tr>
 			<td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
 			<td><input type="text" name="IpWhitelist" value="{{fsliceString .IpWhitelist}}"></td>
+		</tr>
+		<tr>
+			<td><label for="LightFactor">Factor to correct measured analog light value</label></td>
+			<td><input type="number" name="LightFactor" value="{{.LightFactor}}" required></td>
 		</tr>	
 	</table>
 	<br>
