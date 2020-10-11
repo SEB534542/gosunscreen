@@ -90,5 +90,7 @@ func TestautoSunscreen() {
 		RefreshRate:           10,
 		EnableMail:            false,
 		MoveHistory:           0,
+		LightFactor:           15,
 	}
+	SaveToJson(config, "config_test.json")
 }
