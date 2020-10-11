@@ -276,12 +276,17 @@ func (ls *LightSensor) monitorLight() {
 	for {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
+			// Sun is up, monitor light
 			ls.data = append(ls.GetCurrentLight(), ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
 				ls.data = ls.data[:maxLen]
 			}
+		} else if time.Now().After(config.Sunset) {
+			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
+			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
+			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 		} else {
 			// Sun is not up
 			ls.data = []int{}
