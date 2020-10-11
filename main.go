@@ -172,7 +172,11 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 func (ls *LightSensor) GetCurrentLight() []int {
 	lightValues := []int{}
 	for i := 0; i < 10; i++ {
-		lightValues = append(lightValues, ls.getLightValue())
+		lightValue, err := ls.getLightValue()
+		if err != nil {
+			log.Println("Error retrieving light:", err)
+		}
+		lightValues = append(lightValues, lightValue)
 	}
 	x := []int{calcAverage(lightValues...) / lightFactor}
 	if x[0] == 0 {
@@ -181,7 +185,7 @@ func (ls *LightSensor) GetCurrentLight() []int {
 	return x
 }
 
-func (ls *LightSensor) getLightValue() int {
+func (ls *LightSensor) getLightValue() (int, error) {
 	count := 0
 	// Output on the pin for 0.1 seconds
 	ls.pinLight.Output()
@@ -194,9 +198,15 @@ func (ls *LightSensor) getLightValue() int {
 	// Count until the pin goes high
 	for ls.pinLight.Read() == rpio.Low {
 		count++
+		if count > 100000 {
+			return 0, fmt.Errorf("Count is getting too high (%v)", count)
+		}
 	}
-	// log.Println("Current light value is:", count)
-	return count
+	if count == 0 {
+		count = 987
+		return count, fmt.Errorf("Count is zero, returning %v", count)
+	}
+	return count, nil
 }
 
 func calcAverage(xi ...int) int {
