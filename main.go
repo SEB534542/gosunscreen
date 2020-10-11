@@ -68,6 +68,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFile string = "light.csv"
 const lightFactor = 15
+const port = ":8443"
 
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
@@ -277,7 +278,10 @@ func (ls *LightSensor) monitorLight() {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			// Sun is up, monitor light
-			ls.data = append(ls.GetCurrentLight(), ls.data...)
+			mu.Unlock()
+			currentLight := ls.GetCurrentLight()
+			mu.Lock()
+			ls.data = append(currentLight, ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
@@ -348,7 +352,7 @@ func main() {
 	}()
 
 	go ls1.monitorLight()
-	log.Println("Launching website...")
+	log.Printf("Launching website at localhost:%v...", port)
 	http.HandleFunc("/", mainHandler)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", modeHandler)
@@ -357,7 +361,11 @@ func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/light", lightHandler)
-	log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
+	err = http.ListenAndServeTLS(port, "cert.pem", "key.pem", nil)
+	if err != nil {
+		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
+		log.Fatal(http.ListenAndServe(port, nil))
+	}
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
