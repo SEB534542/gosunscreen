@@ -69,7 +69,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFile string = "light.csv"
 const port = ":8443"
-const factorMax = 9999999
+const factorMax = 999999999
 
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
