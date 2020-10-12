@@ -181,7 +181,9 @@ func (ls *LightSensor) GetCurrentLight() []int {
 	}
 	x := []int{calcAverage(lightValues...) / config.LightFactor}
 	if x[0] == 0 {
-		return []int{987}
+		xi := 987654
+		log.Println("Average is zero, returning", xi)
+		return []int{xi}
 	}
 	return x
 }
@@ -204,7 +206,7 @@ func (ls *LightSensor) getLightValue() (int, error) {
 		}
 	}
 	if count == 0 {
-		count = 987
+		count = 987654
 		return count, fmt.Errorf("Count is zero, returning %v", count)
 	}
 	return count, nil
