@@ -69,6 +69,7 @@ const configFile string = "config.json"
 const csvFile string = "sunscreen_stats.csv"
 const lightFile string = "light.csv"
 const port = ":8443"
+const factorMax = 999999
 
 var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
@@ -198,7 +199,7 @@ func (ls *LightSensor) getLightValue() (int, error) {
 	// Count until the pin goes high
 	for ls.pinLight.Read() == rpio.Low {
 		count++
-		if count > 100000 {
+		if count > factorMax {
 			return 0, fmt.Errorf("Count is getting too high (%v)", count)
 		}
 	}
