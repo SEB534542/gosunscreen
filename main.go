@@ -60,18 +60,23 @@ var config = struct {
 	LightFactor           int       // Factor for correcting the measured analog light value
 }{}
 
-const up string = "up"
-const down string = "down"
-const unknown string = "unknown"
-const auto string = "auto"
-const manual string = "manual"
-const configFile string = "config.json"
-const csvFile string = "sunscreen_stats.csv"
-const lightFile string = "light.csv"
+const (
+	up      string = "up"
+	down    string = "down"
+	unknown string = "unknown"
+	auto    string = "auto"
+	manual  string = "manual"
+)
+const (
+	configFile string = "config.json"
+	csvFile    string = "sunscreen_stats.csv"
+	lightFile  string = "light.csv"
+	logFolder         = "logs"
+	logFile    string = "logfile.log"
+)
 const port = ":8443"
 const factorMax = 999999999
 
-var logFile string = "logfile.log" //"logfile" + " " + time.Now().Format("2006-01-02 150405") + ".log"
 var tpl *template.Template
 var mu sync.Mutex
 var fm = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
@@ -244,10 +249,8 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 			mu.Unlock()
 			continue
 		case time.Now().After(config.Sunset):
-			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
+			// Sun is down, moving sunscreen up (if not already up)
 			s.Up()
-			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
-			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 			mu.Unlock()
 			continue
 		case time.Now().Before(config.Sunrise):
@@ -319,12 +322,18 @@ func (ls *LightSensor) monitorLight() {
 func init() {
 	//Loading gohtml templates
 	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("./templates/*"))
+
+	// Check if log folder exists, else create
+	if _, err := os.Stat(logFolder); os.IsNotExist(err) {
+		os.Mkdir(logFolder, 4096)
+	}
 }
 
 func main() {
-	f, err := os.OpenFile("./logs/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// Open logfile or create if not exists
+	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Panic("Error opening file:", err)
+		log.Panic("Error opening log file:", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
@@ -356,7 +365,6 @@ func main() {
 		pin.Output()
 		pin.High()
 	}
-
 	defer func() {
 		log.Println("Closing down...")
 		mu.Lock()
@@ -364,7 +372,9 @@ func main() {
 		mu.Unlock()
 	}()
 
+	// Monitor light
 	go ls1.monitorLight()
+
 	log.Printf("Launching website at localhost:%v...", port)
 	http.HandleFunc("/", mainHandler)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
