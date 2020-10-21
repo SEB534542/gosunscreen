@@ -212,9 +212,9 @@ func (ls *LightSensor) getLightValue() (int, error) {
 		}
 	}
 	if count == 0 {
-		count = 987654
 		return count, fmt.Errorf("Count is zero, returning %v", count)
 	}
+	time.Sleep(time.Millisecond)
 	return count, nil
 }
 
