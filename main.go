@@ -295,13 +295,13 @@ func (ls *LightSensor) monitorLight() {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			// Sun is up, monitor light
-			mu.Unlock()
+			//mu.Unlock()
 			currentLight, err := ls.GetCurrentLight()
 			if err != nil {
 				log.Println("Error retrieving light:", err)
 				continue
 			}
-			mu.Lock()
+			//mu.Lock()
 			ls.data = append([]int{currentLight}, ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
