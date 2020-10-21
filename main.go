@@ -75,7 +75,7 @@ const (
 	logFile    string = "logfile.log"
 )
 const port = ":8443"
-const factorMax = 999999999
+const maxCount = 999999999
 
 var tpl *template.Template
 var mu sync.Mutex
@@ -175,22 +175,23 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 }
 
 // GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
-func (ls *LightSensor) GetCurrentLight() []int {
-	lightValues := []int{}
-	for i := 0; i < 10; i++ {
+func (ls *LightSensor) GetCurrentLight() (int, error) {
+	lightValues := make([]int, 10, 10)
+	for i, _ := range lightValues {
 		lightValue, err := ls.getLightValue()
 		if err != nil {
-			log.Println("Error retrieving light:", err)
+			log.Printf("Error retrieving light (%v): err", i, err)
+			// Remove record from slice and continue loop
+			lightValues = append(lightValues[:i], lightValues[i+1:]...)
+			continue
 		}
 		lightValues = append(lightValues, lightValue)
 	}
-	x := []int{calcAverage(lightValues...) / config.LightFactor}
-	if x[0] == 0 {
-		xi := 987654
-		log.Println("Average is zero, returning", xi)
-		return []int{xi}
+	x := calcAverage(lightValues...) / config.LightFactor
+	if x == 0 {
+		return x, fmt.Errorf("Average light from pin %v is zero", ls.pinLight)
 	}
-	return x
+	return x, nil
 }
 
 func (ls *LightSensor) getLightValue() (int, error) {
@@ -206,7 +207,7 @@ func (ls *LightSensor) getLightValue() (int, error) {
 	// Count until the pin goes high
 	for ls.pinLight.Read() == rpio.Low {
 		count++
-		if count > factorMax {
+		if count > maxCount {
 			return 0, fmt.Errorf("Count is getting too high (%v)", count)
 		}
 	}
@@ -295,9 +296,13 @@ func (ls *LightSensor) monitorLight() {
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			// Sun is up, monitor light
 			mu.Unlock()
-			currentLight := ls.GetCurrentLight()
+			currentLight, err := ls.GetCurrentLight()
+			if err != nil {
+				log.Println("Error retrieving light:", err)
+				continue
+			}
 			mu.Lock()
-			ls.data = append(currentLight, ls.data...)
+			ls.data = append([]int{currentLight}, ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
