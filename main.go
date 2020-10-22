@@ -180,7 +180,7 @@ func (ls *LightSensor) GetCurrentLight() (int, error) {
 	for i, _ := range lightValues {
 		lightValue, err := ls.getLightValue()
 		if err != nil {
-			log.Printf("Error retrieving light (%v): err", i, err)
+			log.Printf("Error retrieving light (%v): %v", i, err)
 			// Remove record from slice and continue loop
 			lightValues = append(lightValues[:i], lightValues[i+1:]...)
 			continue
@@ -208,11 +208,11 @@ func (ls *LightSensor) getLightValue() (int, error) {
 	for ls.pinLight.Read() == rpio.Low {
 		count++
 		if count > maxCount {
-			return 0, fmt.Errorf("Count is getting too high (%v)", count)
+			return count, fmt.Errorf("Count is getting too high (%v)", count)
 		}
 	}
 	if count == 0 {
-		return count, fmt.Errorf("Count is zero, returning %v", count)
+		return count, fmt.Errorf("Count is zero (%v)", count)
 	}
 	time.Sleep(time.Millisecond)
 	return count, nil
