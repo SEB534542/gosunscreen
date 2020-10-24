@@ -174,10 +174,11 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 	}
 }
 
-// GetCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
-func (ls *LightSensor) GetCurrentLight() (int, error) {
+// getCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
+func (ls *LightSensor) getCurrentLight() (int, error) {
 	lightValues := make([]int, 10, 10)
-	for i, _ := range lightValues {
+	i := 0
+	for i < len(lightValues) {
 		lightValue, err := ls.getLightValue()
 		if err != nil {
 			log.Printf("Error retrieving light (%v): %v", i, err)
@@ -186,6 +187,10 @@ func (ls *LightSensor) GetCurrentLight() (int, error) {
 			continue
 		}
 		lightValues = append(lightValues, lightValue)
+		i++
+	}
+	if len(lightValues) == 0 {
+		return 0, fmt.Errorf("No light measured from pin %v", ls.pinLight)
 	}
 	x := calcAverage(lightValues...) / config.LightFactor
 	if x == 0 {
@@ -220,6 +225,9 @@ func (ls *LightSensor) getLightValue() (int, error) {
 
 func calcAverage(xi ...int) int {
 	total := 0
+	if len(xi) == 0 {
+		log.Panic("No values to calculate average from")
+	}
 	for _, v := range xi {
 		total = total + v
 	}
@@ -296,9 +304,10 @@ func (ls *LightSensor) monitorLight() {
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			// Sun is up, monitor light
 			//mu.Unlock()
-			currentLight, err := ls.GetCurrentLight()
+			currentLight, err := ls.getCurrentLight()
 			if err != nil {
 				log.Println("Error retrieving light:", err)
+				mu.Unlock()
 				continue
 			}
 			//mu.Lock()
