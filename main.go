@@ -308,12 +308,11 @@ func (ls *LightSensor) monitorLight() {
 			// Sun is up, monitor light
 			mu.Unlock()
 			currentLight, err := ls.getCurrentLight()
+			mu.Lock()
 			if err != nil {
 				log.Println("Error retrieving light:", err)
-				//mu.Unlock()
-				continue
+				goto End
 			}
-			mu.Lock()
 			ls.data = append([]int{currentLight}, ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
@@ -328,6 +327,7 @@ func (ls *LightSensor) monitorLight() {
 			// Sun is not up yet, ensure data is empty
 			ls.data = []int{}
 		}
+		End:
 		interval := config.Interval
 		mu.Unlock()
 		for i := 0; i < interval; i++ {
