@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/satori/go.uuid"
-	"github.com/stianeikeland/go-rpio"
+	"github.com/stianeikeland/go-rpio/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -211,16 +211,18 @@ func (ls *LightSensor) getLightValue() (int, error) {
 	ls.pinLight.Input()
 
 	// Count until the pin goes high
+	mu.Lock()
 	for ls.pinLight.Read() == rpio.Low {
 		count++
 		if count > maxCount {
+			mu.Unlock()
 			return count, fmt.Errorf("Count is getting too high (%v)", count)
 		}
 	}
+	mu.Unlock()
 	if count == 0 {
 		return count, fmt.Errorf("Count is zero (%v)", count)
 	}
-	time.Sleep(time.Millisecond)
 	return count, nil
 }
 
@@ -304,14 +306,14 @@ func (ls *LightSensor) monitorLight() {
 		mu.Lock()
 		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
 			// Sun is up, monitor light
-			//mu.Unlock()
+			mu.Unlock()
 			currentLight, err := ls.getCurrentLight()
 			if err != nil {
 				log.Println("Error retrieving light:", err)
-				mu.Unlock()
+				//mu.Unlock()
 				continue
 			}
-			//mu.Lock()
+			mu.Lock()
 			ls.data = append([]int{currentLight}, ls.data...)
 			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
 			//ensure ls.data doesnt get too long
