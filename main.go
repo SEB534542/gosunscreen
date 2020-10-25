@@ -187,7 +187,7 @@ func (ls *LightSensor) getCurrentLight() (int, error) {
 			lightValues = append(lightValues[:i], lightValues[i+1:]...)
 			continue
 		}
-		lightValues = append(lightValues, lightValue)
+		lightValues[i] = lightValue
 		i++
 	}
 	if len(lightValues) == 0 {
@@ -328,11 +328,12 @@ func (ls *LightSensor) monitorLight() {
 			ls.data = []int{}
 		}
 		End:
-		interval := config.Interval
-		mu.Unlock()
-		for i := 0; i < interval; i++ {
+		for i := 0; i < config.Interval; i++ {
+			mu.Unlock()
 			time.Sleep(time.Second)
+			mu.Lock()
 		}
+		mu.Unlock()
 	}
 }
 
@@ -392,7 +393,7 @@ func main() {
 	// Monitor light
 	go ls1.monitorLight()
 
-	log.Printf("Launching website at localhost:%v...", port)
+	log.Printf("Launching website at localhost%v...", port)
 	http.HandleFunc("/", mainHandler)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", modeHandler)
