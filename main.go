@@ -75,7 +75,7 @@ const (
 	logFile    string = "logfile.log"
 )
 const port = ":8443"
-const maxCount = 999999999
+const maxCount = 999999
 
 var tpl *template.Template
 var mu sync.Mutex
@@ -176,12 +176,13 @@ func (s *Sunscreen) evalPosition(lightData []int) {
 
 // getCurrentLight collects the average input from the light sensor ls and returns the value as a slice of int
 func (ls *LightSensor) getCurrentLight() (int, error) {
-	lightValues := make([]int, 10, 10)
+	freq := 10
+	lightValues := make([]int, freq, freq)
 	i := 0
 	for i < len(lightValues) {
 		lightValue, err := ls.getLightValue()
 		if err != nil {
-			log.Printf("Error retrieving light (%v): %v", i, err)
+			log.Printf("Error retrieving light (%v/%v): %v", i, len(lightValues), err)
 			// Remove record from slice and continue loop
 			lightValues = append(lightValues[:i], lightValues[i+1:]...)
 			continue
@@ -190,7 +191,7 @@ func (ls *LightSensor) getCurrentLight() (int, error) {
 		i++
 	}
 	if len(lightValues) == 0 {
-		return 0, fmt.Errorf("No light measured from pin %v", ls.pinLight)
+		return 0, fmt.Errorf("All of the %v attemps failed from pin %v", freq, ls.pinLight)
 	}
 	x := calcAverage(lightValues...) / config.LightFactor
 	if x == 0 {
@@ -322,7 +323,7 @@ func (ls *LightSensor) monitorLight() {
 			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
 			config.Sunset = config.Sunset.AddDate(0, 0, 1)
 		} else {
-			// Sun is not up
+			// Sun is not up yet, ensure data is empty
 			ls.data = []int{}
 		}
 		interval := config.Interval
