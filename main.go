@@ -182,7 +182,7 @@ func (ls *LightSensor) getCurrentLight() (int, error) {
 	for i < len(lightValues) {
 		lightValue, err := ls.getLightValue()
 		if err != nil {
-			log.Printf("Error retrieving light (%v/%v): %v", i+1, len(lightValues), err)
+			log.Printf("Error retrieving light (%v/%v): %v", freq-len(lightValues)+i+1, freq, err)
 			// Remove record from slice and continue loop
 			lightValues = append(lightValues[:i], lightValues[i+1:]...)
 			continue
