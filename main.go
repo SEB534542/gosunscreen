@@ -75,7 +75,7 @@ const (
 	logFile    string = "logfile.log"
 )
 const port = ":8443"
-const maxCount = 999999
+const maxCount = 9999999
 
 var tpl *template.Template
 var mu sync.Mutex
