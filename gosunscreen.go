@@ -22,6 +22,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TODO: 1 lightsensor met meerdere zonneschermen, waarbij een zonnescherm zn eigen begin en eindtijd heeft (en de lichtgegevens meet)
+
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type LightSensor struct {
 	pinLight              rpio.Pin      // pin for retrieving light value
