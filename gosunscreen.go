@@ -16,72 +16,86 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SEB534542/seb"
 	"github.com/satori/go.uuid"
 	"github.com/stianeikeland/go-rpio/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
-type Sunscreen struct {
-	Mode     string   // Mode of Sunscreen auto or manual
-	Position string   // Current position of Sunscreen
-	secDown  int      // Seconds to move Sunscreen down
-	secUp    int      // Seconds to move Sunscreen up
-	pinDown  rpio.Pin // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin // GPIO pin for moving sunscreen up
-}
-
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type LightSensor struct {
-	pinLight rpio.Pin // pin for retrieving light value
-	data     []int    // collected light values
+	pinLight              rpio.Pin      // pin for retrieving light value
+	Start                 time.Time     // Time after which Sunscreen can shine on the Sunscreen area
+	Stop                  time.Time     // Time after which Sunscreen no can shine on the Sunscreen area
+	StopThreshold         time.Duration // Duration before Stop that Sunscreen no longer should go down
+	Interval              time.Duration // Interval for checking current light in seconds
+	LightGoodValue        int           // Max measured light value that counts as "good weather"
+	LightGoodThreshold    int           // Number of times light should be below lightGoodValue
+	LightNeutralValue     int           // Max measured light value that counts as "neutral weather"
+	LightNeutralThreshold int           // Number of times light should be above lightNeutralValue
+	LightBadValue         int           // max measured light value that counts as "bad weather"
+	LightBadThreshold     int           // number of times light should be above lightBadValue
+	AllowedOutliers       int           // Number of outliers accepted in the measurement
+	data                  []int         // collected light values
 }
 
-var config = struct {
-	Sunrise               time.Time // Time after which Sunscreen can shine on the Sunscreen area
-	Sunset                time.Time // Time after which Sunscreen no can shine on the Sunscreen area
-	SunsetThreshold       int       // Minutes before sunset that Sunscreen no longer should go down
-	Interval              int       // Interval for checking current light in seconds
-	LightGoodValue        int       // Max measured light value that counts as "good weather"
-	LightGoodThreshold    int       // Number of times light should be below lightGoodValue
-	LightNeutralValue     int       // Max measured light value that counts as "neutral weather"
-	LightNeutralThreshold int       // Number of times light should be above lightNeutralValue
-	LightBadValue         int       // max measured light value that counts as "bad weather"
-	LightBadThreshold     int       // number of times light should be above lightBadValue
-	AllowedOutliers       int       // Number of outliers accepted in the measurement
-	RefreshRate           int       // Number of seconds the main page should refresh
-	EnableMail            bool      // Enable mail functionality
-	MoveHistory           int       // Number of sunscreen movements to be shown
-	LogRecords            int       // Number of log records that are shown
-	Notes                 string    // Field to store comments/notes
-	Username              string    // Username for logging in
-	Password              []byte    // Password for logging in
-	IpWhitelist           []string  // Whitelisted IPs
-	LightFactor           int       // Factor for correcting the measured analog light value
-}{}
+// Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
+type Sunscreen struct {
+	ID       string        // Name and/or ID of sunscreen
+	Mode     string        // Mode of Sunscreen auto or manual
+	Position string        // Current position of Sunscreen
+	timeDown time.Duration // Seconds to move Sunscreen down
+	timeUp   time.Duration // Seconds to move Sunscreen up
+	pinDown  rpio.Pin      // GPIO pin for moving sunscreen down
+	pinUp    rpio.Pin      // GPIO pin for moving sunscreen up
+	LightSensor
+}
+
+type config struct {
+	RefreshRate time.Duration // Number of seconds the main page should refresh
+	EnableMail  bool          // Enable mail functionality
+	MoveHistory int           // Number of sunscreen movements to be shown
+	LogRecords  int           // Number of log records that are shown
+	Notes       string        // Field to store comments/notes
+	Username    string        // Username for logging in
+	Password    []byte        // Password for logging in
+	IpWhitelist []string      // Whitelisted IPs
+	LightFactor int           // Factor for correcting the measured analog light value
+	port        int
+}
 
 const (
-	up      string = "up"
-	down    string = "down"
-	unknown string = "unknown"
-	auto    string = "auto"
-	manual  string = "manual"
+	up       = "up"
+	down     = "down"
+	unknown  = "unknown"
+	auto     = "auto"
+	manual   = "manual"
+	maxCount = 9999999
 )
+
 const (
-	configFile string = "config.json"
-	csvFile    string = "sunscreen_stats.csv"
-	lightFile  string = "light.csv"
-	logFolder         = "logs"
-	logFile    string = "logfile.log"
+	logFolder = "logs"
+	logFile   = "logfile.log"
+	csvFile   = "sunscreen_stats.csv"
+	lightFile = "light_stats.csv"
 )
-const port = ":8443"
-const maxCount = 9999999
 
-var tpl *template.Template
-var mu sync.Mutex
-var fm = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
-var dbSessions = map[string]string{}
+const (
+	configFolder  = "config"
+	configFile    = "config.json"
+	sunscreenFile = "sunscreen.json"
+)
 
+var (
+	tpl        *template.Template
+	mu         sync.Mutex
+	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
+	dbSessions = map[string]string{}
+	s          *Sunscreen
+	c          Config
+)
+
+// TODO: Remove ls1 en s1
 var ls1 = &LightSensor{
 	pinLight: rpio.Pin(23),
 	data:     []int{},
@@ -93,6 +107,78 @@ var s1 = &Sunscreen{
 	secUp:    20,
 	pinDown:  rpio.Pin(21),
 	pinUp:    rpio.Pin(20),
+}
+
+func init() {
+	//Loading gohtml templates
+	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("./templates/*"))
+
+	// Check if log folder exists, else create
+	if _, err := os.Stat(logFolder); os.IsNotExist(err) {
+		os.Mkdir(logFolder, 4096)
+	}
+}
+
+func main() {
+	// Open logfile or create if not exists
+	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panic("Error opening log file:", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
+	log.Println("--------Start of program--------")
+
+	// Load general config, including webserver port
+	err := seb.LoadConfig("./"+configFolder+"/"+configFile, &c)
+	checkErr(err)
+	if c.Port == 0 {
+		c.Port = 8080
+		log.Print("Unable to load port from %v, set port to %v", c)
+	}
+
+	// Load sunscreen
+	err = seb.LoadConfig("./"+configFolder+"/"+sunscreenFile, &s)
+
+	//Resetting Start and Stop to today
+	s.LightSensor.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
+	s.LightSensor.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
+	log.Printf("Start: %v, Stop: %v\n", s.LightSensor.Start.Format("2 Jan 15:04 MST"), s.LightSensor.Stop.Format("2 Jan 15:04 MST"))
+
+	// Connecting to rpio Pins
+	rpio.Open()
+	defer rpio.Close()
+
+	// TODO: remove below(?)
+	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
+		pin.Output()
+		pin.High()
+	}
+	defer func() {
+		log.Println("Closing down...")
+		mu.Lock()
+		s.Up()
+		mu.Unlock()
+	}()
+
+	// Monitor light
+	go ls1.monitorLight()
+
+	log.Printf("Launching website at localhost%v...", port)
+	http.HandleFunc("/", mainHandler)
+	http.Handle("/favicon.ico", http.NotFoundHandler())
+	http.HandleFunc("/mode/", modeHandler)
+	http.HandleFunc("/config/", configHandler)
+	http.HandleFunc("/log/", logHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/logout", logoutHandler)
+	http.HandleFunc("/light", lightHandler)
+	err = http.ListenAndServeTLS(port, "cert.pem", "key.pem", nil)
+	if err != nil {
+		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
+		log.Fatal(http.ListenAndServe(port, nil))
+	}
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -327,85 +413,13 @@ func (ls *LightSensor) monitorLight() {
 			// Sun is not up yet, ensure data is empty
 			ls.data = []int{}
 		}
-		End:
+	End:
 		for i := 0; i < config.Interval; i++ {
 			mu.Unlock()
 			time.Sleep(time.Second)
 			mu.Lock()
 		}
 		mu.Unlock()
-	}
-}
-
-func init() {
-	//Loading gohtml templates
-	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("./templates/*"))
-
-	// Check if log folder exists, else create
-	if _, err := os.Stat(logFolder); os.IsNotExist(err) {
-		os.Mkdir(logFolder, 4096)
-	}
-}
-
-func main() {
-	// Open logfile or create if not exists
-	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panic("Error opening log file:", err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
-	log.Println("--------Start of program--------")
-
-	//Loading config
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		log.Panic("Config file does not exist, shutting down...")
-	} else {
-		data, err := ioutil.ReadFile(configFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = json.Unmarshal(data, &config)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	//Resetting Sunrise and Sunset to today
-	config.Sunrise = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
-	config.Sunset = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
-	log.Printf("Sunrise: %v, Sunset: %v\n", config.Sunrise.Format("2 Jan 15:04 MST"), config.Sunset.Format("2 Jan 15:04 MST"))
-
-	// Connecting to rpio Pins
-	rpio.Open()
-	defer rpio.Close()
-	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
-		pin.Output()
-		pin.High()
-	}
-	defer func() {
-		log.Println("Closing down...")
-		mu.Lock()
-		s1.Up()
-		mu.Unlock()
-	}()
-
-	// Monitor light
-	go ls1.monitorLight()
-
-	log.Printf("Launching website at localhost%v...", port)
-	http.HandleFunc("/", mainHandler)
-	http.Handle("/favicon.ico", http.NotFoundHandler())
-	http.HandleFunc("/mode/", modeHandler)
-	http.HandleFunc("/config/", configHandler)
-	http.HandleFunc("/log/", logHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/logout", logoutHandler)
-	http.HandleFunc("/light", lightHandler)
-	err = http.ListenAndServeTLS(port, "cert.pem", "key.pem", nil)
-	if err != nil {
-		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
-		log.Fatal(http.ListenAndServe(port, nil))
 	}
 }
 
