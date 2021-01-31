@@ -27,9 +27,6 @@ import (
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type LightSensor struct {
 	pinLight              rpio.Pin      // pin for retrieving light value
-	Start                 time.Time     // Time after which Sunscreen can shine on the Sunscreen area
-	Stop                  time.Time     // Time after which Sunscreen no can shine on the Sunscreen area
-	StopThreshold         time.Duration // Duration before Stop that Sunscreen no longer should go down
 	Interval              time.Duration // Interval for checking current light in seconds
 	LightGoodValue        int           // Max measured light value that counts as "good weather"
 	LightGoodThreshold    int           // Number of times light should be below lightGoodValue
@@ -43,14 +40,21 @@ type LightSensor struct {
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	ID       string        // Name and/or ID of sunscreen
-	Mode     string        // Mode of Sunscreen auto or manual
-	Position string        // Current position of Sunscreen
-	timeDown time.Duration // Seconds to move Sunscreen down
-	timeUp   time.Duration // Seconds to move Sunscreen up
-	pinDown  rpio.Pin      // GPIO pin for moving sunscreen down
-	pinUp    rpio.Pin      // GPIO pin for moving sunscreen up
-	LightSensor
+	ID            string        // Name and/or ID of sunscreen
+	Mode          string        // Mode of Sunscreen auto or manual
+	Position      string        // Current position of Sunscreen
+	timeDown      time.Duration // Seconds to move Sunscreen down
+	timeUp        time.Duration // Seconds to move Sunscreen up
+	pinDown       rpio.Pin      // GPIO pin for moving sunscreen down
+	pinUp         rpio.Pin      // GPIO pin for moving sunscreen up
+	Start         time.Time     // Time after which Sunscreen can shine on the Sunscreen area
+	Stop          time.Time     // Time after which Sunscreen no can shine on the Sunscreen area
+	StopThreshold time.Duration // Duration before Stop that Sunscreen no longer should go down
+}
+
+type Site struct {
+	Sunscreens []*Sunscreen
+	*LightSensor
 }
 
 type config struct {
@@ -66,6 +70,7 @@ type config struct {
 	port        int
 }
 
+// General constants
 const (
 	up       = "up"
 	down     = "down"
@@ -75,6 +80,7 @@ const (
 	maxCount = 9999999
 )
 
+// Constants for log folder and files
 const (
 	logFolder = "logs"
 	logFile   = "logfile.log"
@@ -82,6 +88,7 @@ const (
 	lightFile = "light_stats.csv"
 )
 
+// Constants for config folder and files
 const (
 	configFolder  = "config"
 	configFile    = "config.json"
@@ -93,23 +100,23 @@ var (
 	mu         sync.Mutex
 	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
 	dbSessions = map[string]string{}
-	s          *Sunscreen
-	c          Config
+	site       Site
+	config     Config
 )
 
-// TODO: Remove ls1 en s1
-var ls1 = &LightSensor{
-	pinLight: rpio.Pin(23),
-	data:     []int{},
-}
-var s1 = &Sunscreen{
-	Mode:     manual,
-	Position: up,
-	secDown:  17,
-	secUp:    20,
-	pinDown:  rpio.Pin(21),
-	pinUp:    rpio.Pin(20),
-}
+// // TODO: Remove ls1 en s1
+// var s = &LightSensor{
+// 	pinLight: rpio.Pin(23),
+// 	data:     []int{},
+// }
+// var s1 = &Sunscreen{
+// 	Mode:     manual,
+// 	Position: up,
+// 	secDown:  17,
+// 	secUp:    20,
+// 	pinDown:  rpio.Pin(21),
+// 	pinUp:    rpio.Pin(20),
+// }
 
 func init() {
 	//Loading gohtml templates
@@ -123,7 +130,7 @@ func init() {
 
 func main() {
 	// Open logfile or create if not exists
-	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Panic("Error opening log file:", err)
 	}
@@ -132,27 +139,29 @@ func main() {
 
 	log.Println("--------Start of program--------")
 
-	// Load general config, including webserver port
+	// Load general config
 	err := seb.LoadConfig("./"+configFolder+"/"+configFile, &c)
 	checkErr(err)
-	if c.Port == 0 {
-		c.Port = 8080
-		log.Print("Unable to load port from %v, set port to %v", c)
+	if config.Port == 0 {
+		config.Port = 8080
+		log.Print("Unable to load port from %v, set port to %v", config.Port)
 	}
 
-	// Load sunscreen
-	err = seb.LoadConfig("./"+configFolder+"/"+sunscreenFile, &s)
+	// Load site
+	err = seb.LoadConfig("./"+configFolder+"/"+sunscreenFile, &site)
 
 	//Resetting Start and Stop to today
-	s.LightSensor.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunrise.Hour(), config.Sunrise.Minute(), 0, 0, time.Now().Location())
-	s.LightSensor.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), config.Sunset.Hour(), config.Sunset.Minute(), 0, 0, time.Now().Location())
-	log.Printf("Start: %v, Stop: %v\n", s.LightSensor.Start.Format("2 Jan 15:04 MST"), s.LightSensor.Stop.Format("2 Jan 15:04 MST"))
+	for _, s := range site.Sunscreens {
+		s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location())
+		s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location())
+		log.Printf("Start: %v, Stop: %v\n", s.Start.Format("2 Jan 15:04 MST"), s.Stop.Format("2 Jan 15:04 MST"))
+	}
 
 	// Connecting to rpio Pins
 	rpio.Open()
 	defer rpio.Close()
 
-	// TODO: remove below(?)
+	// TODO: remove below(?) / rewrite for all
 	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
 		pin.Output()
 		pin.High()
@@ -165,7 +174,7 @@ func main() {
 	}()
 
 	// Monitor light
-	go ls1.monitorLight()
+	go site.Lightsensor.monitorLight()
 
 	log.Printf("Launching website at localhost%v...", port)
 	http.HandleFunc("/", mainHandler)
@@ -416,7 +425,8 @@ func (ls *LightSensor) monitorLight() {
 			ls.data = []int{}
 		}
 	End:
-		for i := 0; i < config.Interval; i++ {
+		start = time.Now()
+		for time.Until(start.Add(ls.Interval)) > 0 {
 			mu.Unlock()
 			time.Sleep(time.Second)
 			mu.Lock()
