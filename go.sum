@@ -2,6 +2,8 @@ github.com/PuerkitoBio/goquery v1.5.1 h1:PSPBGne8NIUWw+/7vFBV+kG2J/5MOjbzc7154Oa
 github.com/PuerkitoBio/goquery v1.5.1/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/SEB534542/seb v0.0.0-20200917092836-bdf80c3abccf h1:U7sIVCehZryGkyttFZ1QLZnLfmvj2hYnNYK27/xj/YQ=
 github.com/SEB534542/seb v0.0.0-20200917092836-bdf80c3abccf/go.mod h1:tDBEiUUPbjih4OqlUecMMgKnQkQ75iFUR2xa6V/v7YQ=
+github.com/SEB534542/seb v0.0.0-20210112142844-6b0a7f213faf h1:0/r5RePpx+XtGfYmxxu08cnNHNugMQXt6MW6tpLTZs8=
+github.com/SEB534542/seb v0.0.0-20210112142844-6b0a7f213faf/go.mod h1:tDBEiUUPbjih4OqlUecMMgKnQkQ75iFUR2xa6V/v7YQ=
 github.com/andybalholm/cascadia v1.1.0 h1:BuuO6sSfQNFRu1LppgbD25Hr2vLYW25JvxHs5zzsLTo=
 github.com/andybalholm/cascadia v1.1.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/satori/go.uuid v1.2.0 h1:0uYX9dsZ2yD7q2RtLRtPSdGDWzjeM3TbMJP9utgA0ww=

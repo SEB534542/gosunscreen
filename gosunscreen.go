@@ -40,11 +40,11 @@ type LightSensor struct {
 
 // Sunscreen represents a physical Sunscreen that can be controlled through 2 GPIO pins: one for moving it up, and one for moving it down.
 type Sunscreen struct {
-	ID            string        // Name and/or ID of sunscreen
+	Id            string        // Name and/or ID of sunscreen
 	Mode          string        // Mode of Sunscreen auto or manual
 	Position      string        // Current position of Sunscreen
-	timeDown      time.Duration // Seconds to move Sunscreen down
-	timeUp        time.Duration // Seconds to move Sunscreen up
+	durDown       time.Duration // Duration to move Sunscreen down
+	durUp         time.Duration // Duration to move Sunscreen up
 	pinDown       rpio.Pin      // GPIO pin for moving sunscreen down
 	pinUp         rpio.Pin      // GPIO pin for moving sunscreen up
 	Start         time.Time     // Time after which Sunscreen can shine on the Sunscreen area
@@ -57,7 +57,7 @@ type Site struct {
 	*LightSensor
 }
 
-type config struct {
+type Config struct {
 	RefreshRate time.Duration // Number of seconds the main page should refresh
 	EnableMail  bool          // Enable mail functionality
 	MoveHistory int           // Number of sunscreen movements to be shown
@@ -140,21 +140,21 @@ func main() {
 	log.Println("--------Start of program--------")
 
 	// Load general config
-	err := seb.LoadConfig("./"+configFolder+"/"+configFile, &c)
+	err = seb.LoadConfig("./"+configFolder+"/"+configFile, &config)
 	checkErr(err)
 	if config.Port == 0 {
 		config.Port = 8080
 		log.Print("Unable to load port from %v, set port to %v", config.Port)
 	}
 
-	// Load site
+	// Load site config (sunscreens and lightsensor)
 	err = seb.LoadConfig("./"+configFolder+"/"+sunscreenFile, &site)
 
 	//Resetting Start and Stop to today
 	for _, s := range site.Sunscreens {
 		s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location())
 		s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location())
-		log.Printf("Start: %v, Stop: %v\n", s.Start.Format("2 Jan 15:04 MST"), s.Stop.Format("2 Jan 15:04 MST"))
+		log.Printf("%v Start: %v, Stop: %v\n", s.Id, s.Start.Format("2 Jan 15:04 MST"), s.Stop.Format("2 Jan 15:04 MST"))
 	}
 
 	// Connecting to rpio Pins
@@ -162,21 +162,21 @@ func main() {
 	defer rpio.Close()
 
 	// TODO: remove below(?) / rewrite for all
-	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
-		pin.Output()
-		pin.High()
-	}
-	defer func() {
-		log.Println("Closing down...")
-		mu.Lock()
-		s.Up()
-		mu.Unlock()
-	}()
+	//	for _, pin := range []rpio.Pin{s1.pinDown, s1.pinUp} {
+	//		pin.Output()
+	//		pin.High()
+	//	}
+	//	defer func() {
+	//		log.Println("Closing down...")
+	//		mu.Lock()
+	//		s.Up()
+	//		mu.Unlock()
+	//	}()
 
 	// Monitor light
 	go site.Lightsensor.monitorLight()
 
-	log.Printf("Launching website at localhost%v...", port)
+	log.Printf("Launching website at localhost%v...", config.port)
 	http.HandleFunc("/", mainHandler)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", modeHandler)
@@ -185,10 +185,10 @@ func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/light", lightHandler)
-	err = http.ListenAndServeTLS(port, "cert.pem", "key.pem", nil)
+	err = http.ListenAndServeTLS(config.port, "cert.pem", "key.pem", nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
-		log.Fatal(http.ListenAndServe(port, nil))
+		log.Fatal(http.ListenAndServe(config.port, nil))
 	}
 }
 
@@ -198,7 +198,7 @@ func (s *Sunscreen) Move() {
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		s.pinUp.Low()
-		for i := 0; i <= s.secUp; i++ {
+		for i := 0; i <= s.durUp; i++ {
 			time.Sleep(time.Second)
 		}
 		s.pinUp.High()
@@ -206,7 +206,7 @@ func (s *Sunscreen) Move() {
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
 		s.pinDown.Low()
-		for i := 0; i <= s.secDown; i++ {
+		for i := 0; i <= s.durDown; i++ {
 			time.Sleep(time.Second)
 		}
 		s.pinDown.High()
@@ -214,8 +214,8 @@ func (s *Sunscreen) Move() {
 	}
 	new := s.Position
 	mode := s.Mode
-	sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s. Light: %v", old, new, ls1.data))
-	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(ls1.data)}})
+	sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s. Light: %v", old, new, site.LightSensor.data))
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(site.LightSensor.data)}})
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -233,38 +233,38 @@ func (s *Sunscreen) Down() {
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
-func (s *Sunscreen) evalPosition(lightData []int) {
+func (s *Sunscreen) evalPosition(ls LightSensor) {
 	counter := 0
 	switch s.Position {
 	case up:
 		//log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
-		for _, v := range lightData[:(config.LightGoodThreshold + config.AllowedOutliers)] {
-			if v <= config.LightGoodValue {
+		for _, v := range ls.data[:(ls.LightGoodThreshold + ls.AllowedOutliers)] {
+			if v <= ls.LightGoodValue {
 				counter++
 			}
 		}
-		if counter >= config.LightGoodThreshold {
+		if counter >= ls.LightGoodThreshold {
 			s.Move()
 			return
 		}
 	case down:
 		//log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
-		for _, v := range lightData[:(config.LightBadThreshold + config.AllowedOutliers)] {
-			if v >= config.LightBadValue {
+		for _, v := range ls.data[:(ls.LightBadThreshold + ls.AllowedOutliers)] {
+			if v >= ls.LightBadValue {
 				counter++
 			}
 		}
-		if counter >= config.LightBadThreshold {
+		if counter >= ls.LightBadThreshold {
 			s.Move()
 			return
 		}
 		counter = 0
-		for _, v := range lightData[:(config.LightNeutralThreshold + config.AllowedOutliers)] {
-			if v >= config.LightNeutralValue {
+		for _, v := range ls.data[:(ls.LightNeutralThreshold + ls.AllowedOutliers)] {
+			if v >= ls.LightNeutralValue {
 				counter++
 			}
 		}
-		if counter >= config.LightNeutralThreshold {
+		if counter >= ls.LightNeutralThreshold {
 			s.Move()
 			return
 		}
@@ -378,7 +378,7 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
 			//if there is enough light gathered in ls.data, evaluate position
 			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
-				s.evalPosition(ls.data)
+				s.evalPosition(ls)
 			} else if len(ls.data) <= 2 {
 				log.Println("Not enough light gathered...", len(ls.data))
 			}
@@ -915,4 +915,13 @@ func GetIP(req *http.Request) string {
 		return forwarded
 	}
 	return req.RemoteAddr
+}
+
+// CheckErr evaluates err for errors (not nil)
+// and triggers a log.Panic containing the error.
+func checkErr(err error) {
+	if err != nil {
+		log.Panic("Error:", err)
+	}
+	return
 }
