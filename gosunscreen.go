@@ -100,7 +100,7 @@ var (
 	mu         sync.Mutex
 	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": SliceToString}
 	dbSessions = map[string]string{}
-	site       Site
+	site       *Site
 	config     Config
 )
 
