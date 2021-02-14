@@ -67,7 +67,7 @@ type Config struct {
 	Password    []byte        // Password for logging in
 	IpWhitelist []string      // Whitelisted IPs
 	LightFactor int           // Factor for correcting the measured analog light value
-	port        int
+	Port        int
 }
 
 // General constants
@@ -174,9 +174,9 @@ func main() {
 	//	}()
 
 	// Monitor light
-	go site.Lightsensor.monitorLight()
+	go site.LightSensor.monitorLight()
 
-	log.Printf("Launching website at localhost%v...", config.port)
+	log.Printf("Launching website at localhost%v...", config.Port)
 	http.HandleFunc("/", mainHandler)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", modeHandler)
@@ -185,10 +185,10 @@ func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/light", lightHandler)
-	err = http.ListenAndServeTLS(config.port, "cert.pem", "key.pem", nil)
+	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), "cert.pem", "key.pem", nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
-		log.Fatal(http.ListenAndServe(config.port, nil))
+		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
 	}
 }
 
@@ -198,7 +198,8 @@ func (s *Sunscreen) Move() {
 	if s.Position != up {
 		log.Printf("Sunscreen position is %v, moving sunscreen up...\n", s.Position)
 		s.pinUp.Low()
-		for i := 0; i <= s.durUp; i++ {
+		n := time.Now()
+		for time.Now().Before(n.Add(s.durUp)) {
 			time.Sleep(time.Second)
 		}
 		s.pinUp.High()
@@ -206,7 +207,8 @@ func (s *Sunscreen) Move() {
 	} else {
 		log.Printf("Sunscreen position is %v, moving sunscreen down...\n", s.Position)
 		s.pinDown.Low()
-		for i := 0; i <= s.durDown; i++ {
+		n := time.Now()
+		for time.Now().Before(n.Add(s.durDown)) {
 			time.Sleep(time.Second)
 		}
 		s.pinDown.High()
@@ -233,7 +235,7 @@ func (s *Sunscreen) Down() {
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
-func (s *Sunscreen) evalPosition(ls LightSensor) {
+func (s *Sunscreen) evalPosition(ls *LightSensor) {
 	counter := 0
 	switch s.Position {
 	case up:
@@ -343,9 +345,9 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 			return
 		}
 		switch {
-		case config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 && s.Position == up:
-			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v seconds...\n", config.SunsetThreshold, s.Position, int(config.Sunset.Sub(time.Now()).Seconds()))
-			for config.Sunset.Sub(time.Now()).Minutes() <= float64(config.SunsetThreshold) && config.Sunset.Sub(time.Now()).Minutes() > 0 {
+		case time.Now().After(s.Stop.Add(-s.StopThreshold)) && time.Now().Before(s.Stop) && s.Position == up:
+			log.Printf("Sun will set in (less then) %v min and Sunscreen is %v. Snoozing until sunset for %v...\n", s.StopThreshold, s.Position, time.Now().Sub(s.Stop))
+			for time.Now().After(s.Stop.Add(-s.StopThreshold)) && time.Now().Before(s.Stop) {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					mu.Unlock()
@@ -357,15 +359,15 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 			}
 			mu.Unlock()
 			continue
-		case time.Now().After(config.Sunset):
+		case time.Now().After(s.Stop):
 			// Sun is down, moving sunscreen up (if not already up)
 			s.Up()
 			mu.Unlock()
 			continue
-		case time.Now().Before(config.Sunrise):
-			log.Printf("Sun is not yet up, snoozing until %v for %v seconds...\n", config.Sunrise.Format("2 Jan 15:04 MST"), int(config.Sunrise.Sub(time.Now()).Seconds()))
+		case time.Now().Before(s.Start):
+			log.Printf("Sun is not yet up, snoozing until %v for %v...\n", s.Start.Format("2 Jan 15:04 MST"), time.Now().Sub(s.Start))
 			s.Up()
-			for i := 0; float64(i) <= config.Sunrise.Sub(time.Now()).Seconds(); i++ {
+			for time.Now().Before(s.Start) {
 				if s.Mode != auto {
 					log.Println("Mode is no longer auto, closing auto func")
 					mu.Unlock()
@@ -375,16 +377,17 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 				time.Sleep(time.Second)
 				mu.Lock()
 			}
-		case time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset):
+		case time.Now().After(s.Start) && time.Now().Before(s.Stop):
 			//if there is enough light gathered in ls.data, evaluate position
-			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) >= maxLen {
+			if maxLen := MaxIntSlice(ls.LightGoodThreshold, ls.LightBadThreshold, ls.LightNeutralThreshold) + ls.AllowedOutliers; len(ls.data) >= maxLen {
 				s.evalPosition(ls)
 			} else if len(ls.data) <= 2 {
 				log.Println("Not enough light gathered...", len(ls.data))
 			}
 		}
 		//log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
-		for i := 0; i < config.Interval; i++ {
+		n := time.Now()
+		for time.Now().Before(n.Add(ls.Interval)) {
 			if s.Mode != auto {
 				log.Println("Mode is no longer auto, closing auto func")
 				mu.Unlock()
