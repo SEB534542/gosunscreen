@@ -174,7 +174,7 @@ func main() {
 	//	}()
 
 	// Monitor light
-	go site.LightSensor.monitorLight()
+	go site.monitorLight()
 
 	log.Printf("Launching website at localhost%v...", config.Port)
 	http.HandleFunc("/", mainHandler)
@@ -401,35 +401,46 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 	}
 }
 
-func (ls *LightSensor) monitorLight() {
+func (site *Site) monitorLight() {
 	for {
 		mu.Lock()
-		if time.Now().After(config.Sunrise) && time.Now().Before(config.Sunset) {
-			// Sun is up, monitor light
+		var minStart, maxStop time.Time
+		for _, s := range site.Sunscreens {
+			if s.Start.Before(minStart) || minStart.IsZero() {
+				minStart = s.Start
+			}
+			if s.Stop.After(maxStop) || maxStop.IsZero() {
+				maxStop = s.Stop
+			}
+		}
+		if time.Now().After(minStart) && time.Now().Before(maxStop) {
+			// "Sun" is up, monitor light
 			mu.Unlock()
-			currentLight, err := ls.getCurrentLight()
+			currentLight, err := site.LightSensor.getCurrentLight()
 			mu.Lock()
 			if err != nil {
 				log.Println("Error retrieving light:", err)
 				goto End
 			}
-			ls.data = append([]int{currentLight}, ls.data...)
-			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(ls.data[0])}})
+			site.LightSensor.data = append([]int{currentLight}, site.LightSensor.data...)
+			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(site.LightSensor.data[0])}})
 			//ensure ls.data doesnt get too long
-			if maxLen := MaxIntSlice(config.LightGoodThreshold, config.LightBadThreshold, config.LightNeutralThreshold) + config.AllowedOutliers; len(ls.data) > maxLen {
-				ls.data = ls.data[:maxLen]
+			if maxLen := MaxIntSlice(site.LightSensor.LightGoodThreshold, site.LightSensor.LightBadThreshold, site.LightSensor.LightNeutralThreshold) + site.LightSensor.AllowedOutliers; len(site.LightSensor.data) > maxLen {
+				site.LightSensor.data = site.LightSensor.data[:maxLen]
 			}
-		} else if time.Now().After(config.Sunset) {
-			log.Printf("Sun is down (%v), adjusting Sunrise/set", config.Sunset.Format("2 Jan 15:04 MST"))
-			config.Sunrise = config.Sunrise.AddDate(0, 0, 1)
-			config.Sunset = config.Sunset.AddDate(0, 0, 1)
+		} else if time.Now().After(maxStop) {
+			log.Printf("Sun is down (%v), adjusting Sunrise/set", maxStop.Format("2 Jan 15:04 MST"))
+			for _, s := range site.Sunscreens {
+				s.Start = s.Start.AddDate(0, 0, 1)
+				s.Stop = s.Stop.AddDate(0, 0, 1)
+			}
 		} else {
 			// Sun is not up yet, ensure data is empty
-			ls.data = []int{}
+			site.LightSensor.data = []int{}
 		}
 	End:
-		start = time.Now()
-		for time.Until(start.Add(ls.Interval)) > 0 {
+		n := time.Now()
+		for time.Until(n.Add(site.LightSensor.Interval)) > 0 {
 			mu.Unlock()
 			time.Sleep(time.Second)
 			mu.Lock()
@@ -548,11 +559,11 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	}{
 		s1,
 		time.Now().Format("_2 Jan 06 15:04:05"),
-		config.RefreshRate,
-		ls1.data,
+		int(config.RefreshRate.Seconds()),
+		site.LightSensor.data,
 		reverseXSS(stats),
 		config.MoveHistory,
-		len(ls1.data),
+		len(site.LightSensor.data),
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
@@ -594,7 +605,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 	switch mode {
 	case auto:
 		if s1.Mode == manual {
-			go s1.autoSunscreen(ls1)
+			go s1.autoSunscreen(site.LightSensor)
 			s1.Mode = auto
 			log.Printf("Set mode to auto (%v)\n", s1.Mode)
 		} else {
