@@ -178,14 +178,14 @@ func main() {
 	go site.monitorLight()
 
 	log.Printf("Launching website at localhost:%v...", config.Port)
-	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/", handlerMain)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
-	http.HandleFunc("/mode/", modeHandler)
-	http.HandleFunc("/config/", configHandler)
-	http.HandleFunc("/log/", logHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/logout", logoutHandler)
-	http.HandleFunc("/light", lightHandler)
+	http.HandleFunc("/mode/", handlerMode)
+	http.HandleFunc("/config/", handlerConfig)
+	http.HandleFunc("/log/", handlerLog)
+	http.HandleFunc("/login", handlerLogin)
+	http.HandleFunc("/logout", handlerLogout)
+	http.HandleFunc("/light", handlerLight)
 	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), "cert.pem", "key.pem", nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
@@ -450,7 +450,7 @@ func (site *Site) monitorLight() {
 	}
 }
 
-func loginHandler(w http.ResponseWriter, req *http.Request) {
+func handlerLogin(w http.ResponseWriter, req *http.Request) {
 	if alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
@@ -519,7 +519,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func logoutHandler(w http.ResponseWriter, req *http.Request) {
+func handlerLogout(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
@@ -538,7 +538,7 @@ func logoutHandler(w http.ResponseWriter, req *http.Request) {
 	http.Redirect(w, req, "/login", http.StatusSeeOther)
 }
 
-func mainHandler(w http.ResponseWriter, req *http.Request) {
+func handlerMain(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
@@ -553,7 +553,6 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		*Site
 		Time         string
 		RefreshRate  int
-		Light        []int
 		Stats        [][]string
 		MoveHistory  int
 		LightHistory int
@@ -561,7 +560,6 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 		site,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		int(config.RefreshRate.Seconds()),
-		site.LightSensor.data,
 		reverseXSS(stats),
 		config.MoveHistory,
 		len(site.LightSensor.data),
@@ -573,7 +571,7 @@ func mainHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func lightHandler(w http.ResponseWriter, req *http.Request) {
+func handlerLight(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
@@ -595,7 +593,7 @@ func lightHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func modeHandler(w http.ResponseWriter, req *http.Request) {
+func handlerMode(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
@@ -638,7 +636,7 @@ func modeHandler(w http.ResponseWriter, req *http.Request) {
 	http.Redirect(w, req, "/", http.StatusFound)
 }
 
-func configHandler(w http.ResponseWriter, req *http.Request) {
+func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
@@ -648,6 +646,20 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 	if req.Method == http.MethodPost {
+		// TODO: check if there is anything after "/config/", ie the sunscreen ID
+		// idMode := req.URL.Path[len("/mode/"):]
+		// id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
+		// if err != nil {
+		// 	// TODO: error handling msg to display
+		// 	log.Fatalln(err)
+		// }
+		// mode := idMode[strings.Index(idMode, "/")+1:]
+		// i, err := site.sIndex(id)
+		// if err != nil {
+		// 	// TODO: error handling msg to display
+		// 	log.Fatalln(err)
+		// }
+
 		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
 		if err != nil {
 			log.Fatalln(err)
@@ -746,7 +758,7 @@ func configHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func logHandler(w http.ResponseWriter, req *http.Request) {
+func handlerLog(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
