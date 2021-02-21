@@ -55,8 +55,8 @@ type Sunscreen struct {
 }
 
 type Site struct {
-	Sunscreens []*Sunscreen
-	*LightSensor
+	Sunscreens  []*Sunscreen
+	LightSensor *LightSensor
 }
 
 type Config struct {
@@ -90,9 +90,9 @@ const (
 
 // Constants for config folder and files
 const (
-	configFolder  = "config"
-	configFile    = "config.json"
-	sunscreenFile = "sunscreen.json"
+	configFolder = "config"
+	configFile   = "config.json"
+	siteFile     = "site.json"
 )
 
 var (
@@ -100,7 +100,7 @@ var (
 	mu         sync.Mutex
 	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": sliceToString, "fminutes": minutes, "fseconds": seconds}
 	dbSessions = map[string]string{}
-	site       *Site
+	site       = &Site{}
 	config     Config
 )
 
@@ -126,29 +126,43 @@ func init() {
 	if _, err := os.Stat(logFolder); os.IsNotExist(err) {
 		os.Mkdir(logFolder, 4096)
 	}
+
+	// Check if log folder exists, else create
+	if _, err := os.Stat(configFolder); os.IsNotExist(err) {
+		os.Mkdir(configFolder, 4096)
+	}
 }
 
 func main() {
+	// TODO: include below lines
 	// Open logfile or create if not exists
-	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panic("Error opening log file:", err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
+	//	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	//	if err != nil {
+	//		log.Panic("Error opening log file:", err)
+	//	}
+	//	defer f.Close()
+	//	log.SetOutput(f)
 
 	log.Println("--------Start of program--------")
 
 	// Load general config
-	err = seb.LoadConfig("./"+configFolder+"/"+configFile, &config)
+	err := seb.LoadConfig("./"+configFolder+"/"+configFile, &config)
 	checkErr(err)
 	if config.Port == 0 {
 		config.Port = 8080
-		log.Print("Unable to load port from %v, set port to %v", config.Port)
+		log.Printf("Unable to load port, set port to default (%v)", config.Port)
+	}
+	if config.Username == "" {
+		config.Username = "admin"
+		pw, err := bcrypt.GenerateFromPassword([]byte("today"), bcrypt.MinCost)
+		if err != nil {
+			log.Fatal("Error setting default password:", err)
+		}
+		config.Password = pw
 	}
 
 	// Load site config (sunscreens and lightsensor)
-	err = seb.LoadConfig("./"+configFolder+"/"+sunscreenFile, &site)
+	err = seb.LoadConfig("./"+configFolder+"/"+siteFile, &site)
 
 	//Resetting Start and Stop to today
 	for _, s := range site.Sunscreens {
@@ -174,8 +188,9 @@ func main() {
 	//	}()
 
 	// Monitor light
-	go site.monitorLight()
-
+	if site.LightSensor != nil {
+		go site.monitorLight()
+	}
 	log.Printf("Launching website at localhost:%v...", config.Port)
 	http.HandleFunc("/", handlerMain)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
@@ -548,6 +563,10 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
 	}
+	var l int
+	if site.LightSensor != nil {
+		l = len(site.LightSensor.data)
+	}
 	data := struct {
 		*Site
 		Time         string
@@ -561,7 +580,7 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 		int(config.RefreshRate.Seconds()),
 		reverseXSS(stats),
 		config.MoveHistory,
-		len(site.LightSensor.data),
+		l,
 	}
 	mu.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
