@@ -24,26 +24,30 @@
 
 <h1>Sunscreen homepage</h1>
 
-<p>Last updated: {{.Time}} <i>(updates every {{.RefreshRate}} seconds automatically)</i></p>
+<p>Last updated: {{.Time}} <i>(refreshes every {{.RefreshRate}} automatically)</i></p>
+
+{{range .Sunscreens}}
 <table>
-<tr>
-<td>
-<table border="1px solid black" CELLPADDING=3>
 	<tr>
-		<td><b>Mode:</b></td>
-		<td>{{.Mode}}</td>
-	</tr>
-	<tr>
-		<td><b>Position:</b></td>
-		<td>{{.Position}}</td>
+		<td>
+			<table border="1px solid black" CELLPADDING=3>
+				<tr>
+					<td><b>Mode:</b></td>
+					<td>{{.Mode}}</td>
+				</tr>
+				<tr>
+					<td><b>Position:</b></td>
+					<td>{{.Position}}</td>
+				</tr>
+			</table></td>
+		<td>
+			<a href="/mode/{{.Id}}/auto" class="button buttonGreen">Auto</a>
+			<a href="/mode/{{.Id}}/manual/up" class="button buttonBlue">Up</a>
+			<a href="/mode/{{.Id}}/manual/down" class="button buttonBlue">Down</a>
+		</td>
 	</tr>
 </table>
-</td><td>
-<a href="/mode/auto" class="button buttonGreen">Auto</a>
-<a href="/mode/manual/up" class="button buttonBlue">Up</a>
-<a href="/mode/manual/down" class="button buttonBlue">Down</a>
-</td></tr></table>
-
+{{end}}
 
 <p><a href="config">Change configuration</a> / <a href="log">View log</a> / <a href="light">Light</a> / <a href="logout">Logout</a></p>
 
@@ -52,7 +56,7 @@
 {{if gt .LightHistory 0}}
 <td valign="top"><h2>Current Light</h2>
 <table border="0" CELLSPACING=5><tr><td><b>Light new to old</b></td></tr>
-{{range $index, $element := .Light}}
+{{range $index, $element := .Site.LightSensor.Data}}
     <tr><td><li>{{$element}}</li></td></tr>
 {{end}}
 </table>

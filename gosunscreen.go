@@ -35,7 +35,7 @@ type LightSensor struct {
 	LightBadValue         int           // max measured light value that counts as "bad weather"
 	LightBadThreshold     int           // number of times light should be above lightBadValue
 	AllowedOutliers       int           // Number of outliers accepted in the measurement
-	data                  []int         // collected light values
+	Data                  []int         // collected light values
 	LightFactor           int           // Factor for correcting the measured analog light value
 }
 
@@ -83,16 +83,16 @@ const (
 // Constants for log folder and files
 const (
 	logFolder = "logs"
-	logFile   = "logfile.log"
-	csvFile   = "sunscreen_stats.csv"
-	lightFile = "light_stats.csv"
+	logFile   = "./logs/logfile.log"
+	csvFile   = "./logs/sunscreen_stats.csv"
+	lightFile = "./logs/light_stats.csv"
 )
 
 // Constants for config folder and files
 const (
 	configFolder = "config"
-	configFile   = "config.json"
-	siteFile     = "site.json"
+	configFile   = "./config/config.json"
+	siteFile     = "./config/site.json"
 )
 
 var (
@@ -107,7 +107,7 @@ var (
 // // TODO: Remove ls1 en s1
 // var s = &LightSensor{
 // 	PinLight: rpio.Pin(23),
-// 	data:     []int{},
+// 	Data:     []int{},
 // }
 // var s1 = &Sunscreen{
 // 	Mode:     manual,
@@ -136,7 +136,7 @@ func init() {
 func main() {
 	// TODO: include below lines
 	// Open logfile or create if not exists
-	//	f, err := os.OpenFile("./"+logFolder+"/"+logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	//	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	//	if err != nil {
 	//		log.Panic("Error opening log file:", err)
 	//	}
@@ -146,7 +146,7 @@ func main() {
 	log.Println("--------Start of program--------")
 
 	// Load general config
-	err := seb.LoadConfig("./"+configFolder+"/"+configFile, &config)
+	err := seb.LoadConfig(configFile, &config)
 	checkErr(err)
 	if config.Port == 0 {
 		config.Port = 8080
@@ -160,9 +160,13 @@ func main() {
 		}
 		config.Password = pw
 	}
+	if config.RefreshRate == time.Duration(0) {
+		config.RefreshRate, err = time.ParseDuration("1h")
+		checkErr(err)
+	}
 
 	// Load site config (sunscreens and lightsensor)
-	err = seb.LoadConfig("./"+configFolder+"/"+siteFile, &site)
+	err = seb.LoadConfig(siteFile, &site)
 
 	//Resetting Start and Stop to today
 	for _, s := range site.Sunscreens {
@@ -231,8 +235,8 @@ func (s *Sunscreen) Move() {
 	}
 	new := s.Position
 	mode := s.Mode
-	sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s. Light: %v", old, new, site.LightSensor.data))
-	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(site.LightSensor.data)}})
+	sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s. Light: %v", old, new, site.LightSensor.Data))
+	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(site.LightSensor.Data)}})
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
@@ -255,7 +259,7 @@ func (s *Sunscreen) evalPosition(ls *LightSensor) {
 	switch s.Position {
 	case up:
 		//log.Printf("Sunscreen is %v. Check if weather is good to go down\n", s.Position)
-		for _, v := range ls.data[:(ls.LightGoodThreshold + ls.AllowedOutliers)] {
+		for _, v := range ls.Data[:(ls.LightGoodThreshold + ls.AllowedOutliers)] {
 			if v <= ls.LightGoodValue {
 				counter++
 			}
@@ -266,7 +270,7 @@ func (s *Sunscreen) evalPosition(ls *LightSensor) {
 		}
 	case down:
 		//log.Printf("Sunscreen is %v. Check if it should go up\n", s.Position)
-		for _, v := range ls.data[:(ls.LightBadThreshold + ls.AllowedOutliers)] {
+		for _, v := range ls.Data[:(ls.LightBadThreshold + ls.AllowedOutliers)] {
 			if v >= ls.LightBadValue {
 				counter++
 			}
@@ -276,7 +280,7 @@ func (s *Sunscreen) evalPosition(ls *LightSensor) {
 			return
 		}
 		counter = 0
-		for _, v := range ls.data[:(ls.LightNeutralThreshold + ls.AllowedOutliers)] {
+		for _, v := range ls.Data[:(ls.LightNeutralThreshold + ls.AllowedOutliers)] {
 			if v >= ls.LightNeutralValue {
 				counter++
 			}
@@ -393,11 +397,11 @@ func (s *Sunscreen) autoSunscreen(ls *LightSensor) {
 				mu.Lock()
 			}
 		case time.Now().After(s.Start) && time.Now().Before(s.Stop):
-			//if there is enough light gathered in ls.data, evaluate position
-			if maxLen := MaxIntSlice(ls.LightGoodThreshold, ls.LightBadThreshold, ls.LightNeutralThreshold) + ls.AllowedOutliers; len(ls.data) >= maxLen {
+			//if there is enough light gathered in ls.Data, evaluate position
+			if maxLen := MaxIntSlice(ls.LightGoodThreshold, ls.LightBadThreshold, ls.LightNeutralThreshold) + ls.AllowedOutliers; len(ls.Data) >= maxLen {
 				s.evalPosition(ls)
-			} else if len(ls.data) <= 2 {
-				log.Println("Not enough light gathered...", len(ls.data))
+			} else if len(ls.Data) <= 2 {
+				log.Println("Not enough light gathered...", len(ls.Data))
 			}
 		}
 		//log.Printf("Completed cycle, sleeping for %v second(s)...\n", config.Interval)
@@ -437,11 +441,11 @@ func (site *Site) monitorLight() {
 				log.Println("Error retrieving light:", err)
 				goto End
 			}
-			site.LightSensor.data = append([]int{currentLight}, site.LightSensor.data...)
-			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(site.LightSensor.data[0])}})
-			//ensure ls.data doesnt get too long
-			if maxLen := MaxIntSlice(site.LightSensor.LightGoodThreshold, site.LightSensor.LightBadThreshold, site.LightSensor.LightNeutralThreshold) + site.LightSensor.AllowedOutliers; len(site.LightSensor.data) > maxLen {
-				site.LightSensor.data = site.LightSensor.data[:maxLen]
+			site.LightSensor.Data = append([]int{currentLight}, site.LightSensor.Data...)
+			appendCSV(lightFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(site.LightSensor.Data[0])}})
+			//ensure ls.Data doesnt get too long
+			if maxLen := MaxIntSlice(site.LightSensor.LightGoodThreshold, site.LightSensor.LightBadThreshold, site.LightSensor.LightNeutralThreshold) + site.LightSensor.AllowedOutliers; len(site.LightSensor.Data) > maxLen {
+				site.LightSensor.Data = site.LightSensor.Data[:maxLen]
 			}
 		} else if time.Now().After(maxStop) {
 			log.Printf("Sun is down (%v), adjusting Sunrise/set", maxStop.Format("2 Jan 15:04 MST"))
@@ -450,8 +454,8 @@ func (site *Site) monitorLight() {
 				s.Stop = s.Stop.AddDate(0, 0, 1)
 			}
 		} else {
-			// Sun is not up yet, ensure data is empty
-			site.LightSensor.data = []int{}
+			// Sun is not up yet, ensure Data is empty
+			site.LightSensor.Data = []int{}
 		}
 	End:
 		n := time.Now()
@@ -565,19 +569,19 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 	}
 	var l int
 	if site.LightSensor != nil {
-		l = len(site.LightSensor.data)
+		l = len(site.LightSensor.Data)
 	}
 	data := struct {
 		*Site
 		Time         string
-		RefreshRate  int
+		RefreshRate  time.Duration
 		Stats        [][]string
 		MoveHistory  int
 		LightHistory int
 	}{
 		site,
 		time.Now().Format("_2 Jan 06 15:04:05"),
-		int(config.RefreshRate.Seconds()),
+		config.RefreshRate, //int(config.RefreshRate.Seconds()),
 		reverseXSS(stats),
 		config.MoveHistory,
 		l,
@@ -664,122 +668,197 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	// Delete: <a href=“/config/{{.Id}}/delete”><button>Delete {{.Name}}</button></a>
 
 	var err error
-	//	mu.Lock()
-	//	defer mu.Unlock()
-	//	if req.Method == http.MethodPost {
-	//		// TODO: check if there is anything after "/config/", ie the sunscreen ID
-	//		// idMode := req.URL.Path[len("/mode/"):]
-	//		// id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
-	//		// if err != nil {
-	//		// 	// TODO: error handling msg to display
-	//		// 	log.Fatalln(err)
-	//		// }
-	//		// mode := idMode[strings.Index(idMode, "/")+1:]
-	//		// i, err := site.sIndex(id)
-	//		// if err != nil {
-	//		// 	// TODO: error handling msg to display
-	//		// 	log.Fatalln(err)
-	//		// }
+	var msgs []string
 
-	//		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.Sunset, err = StoTime(req.PostFormValue("Sunset"), 0)
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.SunsetThreshold, err = strToInt(req.PostFormValue("SunsetThreshold"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.Interval, err = strToInt(req.PostFormValue("Interval"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.RefreshRate, err = strToInt(req.PostFormValue("RefreshRate"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		if req.PostFormValue("EnableMail") == "" {
-	//			config.EnableMail = false
-	//		} else {
-	//			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
-	//			if err != nil {
-	//				log.Fatalln(err)
-	//			}
-	//		}
-	//		config.MoveHistory, err = strToInt(req.PostFormValue("MoveHistory"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.LogRecords, err = strToInt(req.PostFormValue("LogRecords"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		config.Notes = req.PostFormValue("Notes")
-	//		config.Username = req.PostFormValue("Username")
-	//		if req.PostFormValue("Password") != "" {
-	//			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
-	//			if err != nil {
-	//				http.Error(w, "Current password is incorrect, password has not been changed", http.StatusForbidden)
-	//				SaveToJson(config, configFile)
-	//				log.Println("Updated variables (except for password)")
-	//				return
-	//			} else {
-	//				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
-	//			}
-	//		}
-	//		config.IpWhitelist = func(s string) []string {
-	//			xs := strings.Split(s, ",")
-	//			for i, v := range xs {
-	//				xs[i] = strings.Trim(v, " ")
-	//			}
-	//			return xs
-	//		}(req.PostFormValue("IpWhitelist"))
+	mu.Lock()
+	defer mu.Unlock()
+	if req.Method == http.MethodPost {
+		//		// TODO: check if there is anything after "/config/", ie the sunscreen ID
+		//		// idMode := req.URL.Path[len("/mode/"):]
+		//		// id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
+		//		// if err != nil {
+		//		// 	// TODO: error handling msg to display
+		//		// 	log.Fatalln(err)
+		//		// }
+		//		// mode := idMode[strings.Index(idMode, "/")+1:]
+		//		// i, err := site.sIndex(id)
+		//		// if err != nil {
+		//		// 	// TODO: error handling msg to display
+		//		// 	log.Fatalln(err)
+		//		// }
 
-	//		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
-	//		if err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//		SaveToJson(config, configFile)
-	//		log.Println("Updated variables")
-	//	}
+		// Read and store config
+		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
+		if err != nil {
+			msg := fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err)
+			msgs = append(msgs, msg)
+			log.Println(msg)
+		} else {
+			config.RefreshRate = refreshRate
+		}
+		moveHistory, err := strToInt(req.PostFormValue("MoveHistory"))
+		if err != nil {
+			msg := fmt.Sprintf("Unable to save MoveHistory (%v)", err)
+			msgs = append(msgs, msg)
+			log.Println(msg)
+		} else {
+			config.MoveHistory = moveHistory
+		}
+		logRecords, err := strToInt(req.PostFormValue("LogRecords"))
+		if err != nil {
+			msg := fmt.Sprintf("Unable to save LogRecords (%v)", err)
+			msgs = append(msgs, msg)
+			log.Println(msg)
+		} else {
+			config.LogRecords = logRecords
+		}
+		config.IpWhitelist = func(s string) []string {
+			xs := strings.Split(s, ",")
+			for i, v := range xs {
+				xs[i] = strings.Trim(v, " ")
+			}
+			return xs
+		}(req.PostFormValue("IpWhitelist"))
+		port, err := seb.StrToIntZ(req.PostFormValue("Port"))
+		if err != nil || !(port >= 1000 && port <= 9999) {
+			msg := fmt.Sprintf("Unable to save port '%v', should be within range 1000-9999 (%v)", port, err)
+			msgs = append(msgs, msg)
+			log.Println(msg)
+		} else {
+			config.Port = port
+		}
+		if req.PostFormValue("EnableMail") == "" {
+			config.EnableMail = false
+		} else {
+			//enableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
+			config.EnableMail = true
+		}
+		if req.PostFormValue("Username") != "" && req.PostFormValue("Username") != config.Username {
+			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
+			if err != nil {
+				msg := fmt.Sprintf("Current password is incorrect, username has not been updated")
+				msgs = append(msgs, msg)
+				log.Println(msg)
+			} else {
+				config.Username = req.PostFormValue("Username")
+				msg := fmt.Sprintf("New username saved")
+				msgs = append(msgs, msg)
+				log.Println(msg)
+			}
+		}
+		if req.PostFormValue("Password") != "" {
+			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
+			if err != nil {
+				msg := fmt.Sprintf("Current password is incorrect, password has not been updated")
+				msgs = append(msgs, msg)
+				log.Println(msg)
+			} else {
+				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
+				msg := fmt.Sprintf("New password saved")
+				msgs = append(msgs, msg)
+				log.Println(msg)
+			}
+		}
+
+		// TODO: Read and store lightsensor (in same for?)
+
+		//		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.Sunset, err = StoTime(req.PostFormValue("Sunset"), 0)
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.SunsetThreshold, err = strToInt(req.PostFormValue("SunsetThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.Interval, err = strToInt(req.PostFormValue("Interval"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//
+		//		if req.PostFormValue("EnableMail") == "" {
+		//			config.EnableMail = false
+		//		} else {
+		//			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
+		//			if err != nil {
+		//				log.Fatalln(err)
+		//			}
+		//		}
+		//
+		//
+		//		config.Notes = req.PostFormValue("Notes")
+
+		//		config.IpWhitelist = func(s string) []string {
+		//			xs := strings.Split(s, ",")
+		//			for i, v := range xs {
+		//				xs[i] = strings.Trim(v, " ")
+		//			}
+		//			return xs
+		//		}(req.PostFormValue("IpWhitelist"))
+
+		//		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+
+		var msg string
+		if len(msgs) == 0 {
+			msg = "Saved configuration"
+		} else {
+			msg = "Saved the rest"
+		}
+		msgs = append(msgs, msg)
+		log.Println(msg)
+
+		SaveToJson(config, configFile)
+		SaveToJson(site, siteFile)
+		log.Println("Updated configuration")
+	}
+
+	s := *site
+	if site.LightSensor == nil {
+		s.LightSensor = &LightSensor{}
+	}
 
 	data := struct {
-		*Site
+		Site
 		Config
+		Msgs []string
 	}{
-		site,
+		s,
 		config,
+		msgs,
 	}
 
 	err = tpl.ExecuteTemplate(w, "config.gohtml", data)
@@ -794,7 +873,7 @@ func handlerLog(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	f, err := ioutil.ReadFile("./logs/" + logFile)
+	f, err := ioutil.ReadFile(logFile)
 	if err != nil {
 		fmt.Println("File reading error", err)
 		return

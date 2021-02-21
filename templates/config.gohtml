@@ -5,7 +5,9 @@
     <title>Sunscreen configuration</title>
 </head>
 <body>
-
+{{range .Msgs}}
+	<i>{{.}}</i><br>
+{{end}}
 <h1>Configuration</h1>
 
 <p><a href="/">Click here to go back to home</a></p>
@@ -15,46 +17,53 @@
 	<table>
 		<tr>
 			<td><b>Advanced</b></td>
-			<td><label for="RefreshRate">Website refresh rate (in seconds)</label></td>
+			<td><label for="RefreshRate">Website refresh rate (in minutes)</label></td>
 			<td><input type="number" name="RefreshRate" value="{{fminutes .Config.RefreshRate}}" required></td>
 		</tr>
 		<tr>
-			<td></td><td><label for="MoveHistory">Number of historical Movements</label></td>
-			<td></td><td><input type="number" name="MoveHistory" value="{{.Config.MoveHistory}}" required></td>
+			<td></td>
+			<td><label for="MoveHistory">Number of historical Movements</label></td>
+			<td><input type="number" name="MoveHistory" value="{{.Config.MoveHistory}}" required></td>
 		</tr>
 		<tr>
-			<td></td><td><label for="LogRecords">Number Log records shown</label></td>
-			<td></td><td><input type="number" name="LogRecords" value="{{.Config.LogRecords}}" required></td>
+			<td></td>
+			<td><label for="LogRecords">Number Log records shown</label></td>
+			<td><input type="number" name="LogRecords" value="{{.Config.LogRecords}}" required></td>
 		</tr>
 		<tr>
-			<td></td><td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
-			<td></td><td><input type="text" name="IpWhitelist" value="{{fsliceString .Config.IpWhitelist}}"></td>
+			<td></td>
+			<td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
+			<td><input type="text" name="IpWhitelist" value="{{fsliceString .Config.IpWhitelist}}"></td>
 		</tr>
 		<tr>
-			<td></td><td><label for="Port">Port (range: 1000-9999; requires reboot)</label></td>
-			<td></td><td><input type="text" name="Port" value="{{.Config.Port}}"></td>
-		</tr>
-		
-		<tr>
-			<td>E-mail</td>
-			<td></td><td><label for="EnableMail">EnableMail</label></td>
-			<td></td><td><input type="checkbox" name="EnableMail" value=true {{if eq .Config.EnableMail true}} checked {{end}}></td>		
+			<td></td>
+			<td><label for="Port">Port (range: 1000-9999; requires reboot)</label></td>
+			<td><input type="text" name="Port" value="{{.Config.Port}}"></td>
 		</tr>
 		
 		<tr>
-			<td>Login</td>
-			<td></td><td><label for="Username">Username</label></td>
-			<td></td><td><input type="text" name="Username" value="{{.Config.Username}}" required></td>
+			<td><b>E-mail</b></td>
+			<td><label for="EnableMail">EnableMail</label></td>
+			<td><input type="checkbox" name="EnableMail" value=true {{if eq .Config.EnableMail true}} checked {{end}}></td>		
+		</tr>
+		
+		<tr>
+			<td><b>Login</b></td>
+			<td><label for="Username">Username</label></td>
+			<td><input type="text" name="Username" value="{{.Config.Username}}" required></td>
 		</tr>		
 		<tr>
+			<td></td>
 			<td><label for="CurrentPassword">Current Password</label></td>
 			<td><input type="password" name="CurrentPassword"></td>
 		</tr>		
 		<tr>
+			<td></td>
 			<td><label for="Password">Password</label></td>
 			<td><input type="password" name="Password"></td>
 		</tr>		
 	</table>
+	<br>
 	<input type="submit" value="Save settings"><br>
 </form>
 
@@ -95,6 +104,7 @@
 				<td><input type="number" name="PinUp" value="{{.PinUp}}" required></td>
 			</tr>
 		</table>
+		<br>
 		<input type="submit" value="Save {{.Name}}">
 	</form>
 {{end}}
@@ -115,26 +125,28 @@
 			<td><input type="number" name="Interval" value="{{.Site.LightSensor.Interval}}" required></td>
 		</tr>
 		<tr>
-			<td><label for="LightFactor">Factor to correct measured analog light value</label></td>
+			<td><label for="LightFactor">Analog value correction</label></td>
 			<td><input type="number" name="LightFactor" value="{{.Site.LightSensor.LightFactor}}" required></td>
 		</tr>
 		<tr>
         <td></td><td>Good</td><td>Neutral</td><td>Bad</td>
-      </tr>
-      <tr>
-        <td>Value</td>
-        <td><input type="number" name="LightGoodValue" value="{{.Site.LightSensor.LightGoodValue}}" required></td>
-        <td><input type="number" name="LightNeutralValue" value="{{.Site.LightSensor.LightNeutralValue}}" required></td>
-        <td><input type="number" name="LightBadValue" value="{{.Site.LightSensor.LightBadValue}}" required></td>
-      </tr> 
-      <tr>
-        <td>Threshold</td>
-        <td><input type="number" name="LightGoodThreshold" value="{{.Site.LightSensor.LightGoodThreshold}}" required></td>
-        <td><input type="number" name="LightNeutralThreshold" value="{{.Site.LightSensor.LightNeutralThreshold}}" required></td>
-        <td><input type="number" name="LightBadThreshold" value="{{.Site.LightSensor.LightBadThreshold}}" required></td>
+      	</tr>
+      	<tr>
+      		<td>Value</td>
+        	<td><input type="number" name="LightGoodValue" value="{{.Site.LightSensor.LightGoodValue}}" required></td>
+        	<td><input type="number" name="LightNeutralValue" value="{{.Site.LightSensor.LightNeutralValue}}" required></td>
+        	<td><input type="number" name="LightBadValue" value="{{.Site.LightSensor.LightBadValue}}" required></td>
+      	</tr> 
+		<tr></tr>
+     	<tr>
+	        <td>Threshold</td>
+	        <td><input type="number" name="LightGoodThreshold" value="{{.Site.LightSensor.LightGoodThreshold}}" required></td>
+	        <td><input type="number" name="LightNeutralThreshold" value="{{.Site.LightSensor.LightNeutralThreshold}}" required></td>
+	        <td><input type="number" name="LightBadThreshold" value="{{.Site.LightSensor.LightBadThreshold}}" required></td>
+		</tr>
 	</table>
 	<input type="submit" value="Save Light sensor"><br>
-</form
+</form>
 
 <p><a href="/">Click here to go back to home</a></p>
 
