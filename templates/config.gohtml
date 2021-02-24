@@ -12,61 +12,6 @@
 
 <p><a href="/">Click here to go back to home</a></p>
 
-<h2>Settings</h2>
-<form method="POST">
-	<table>
-		<tr>
-			<td><b>Advanced</b></td>
-			<td><label for="RefreshRate">Website refresh rate (in minutes)</label></td>
-			<td><input type="number" name="RefreshRate" value="{{fminutes .Config.RefreshRate}}" required></td>
-		</tr>
-		<tr>
-			<td></td>
-			<td><label for="MoveHistory">Number of historical Movements</label></td>
-			<td><input type="number" name="MoveHistory" value="{{.Config.MoveHistory}}" required></td>
-		</tr>
-		<tr>
-			<td></td>
-			<td><label for="LogRecords">Number Log records shown</label></td>
-			<td><input type="number" name="LogRecords" value="{{.Config.LogRecords}}" required></td>
-		</tr>
-		<tr>
-			<td></td>
-			<td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
-			<td><input type="text" name="IpWhitelist" value="{{fsliceString .Config.IpWhitelist}}"></td>
-		</tr>
-		<tr>
-			<td></td>
-			<td><label for="Port">Port (range: 1000-9999; requires reboot)</label></td>
-			<td><input type="text" name="Port" value="{{.Config.Port}}"></td>
-		</tr>
-		
-		<tr>
-			<td><b>E-mail</b></td>
-			<td><label for="EnableMail">EnableMail</label></td>
-			<td><input type="checkbox" name="EnableMail" value=true {{if eq .Config.EnableMail true}} checked {{end}}></td>		
-		</tr>
-		
-		<tr>
-			<td><b>Login</b></td>
-			<td><label for="Username">Username</label></td>
-			<td><input type="text" name="Username" value="{{.Config.Username}}" required></td>
-		</tr>		
-		<tr>
-			<td></td>
-			<td><label for="CurrentPassword">Current Password</label></td>
-			<td><input type="password" name="CurrentPassword"></td>
-		</tr>		
-		<tr>
-			<td></td>
-			<td><label for="Password">Password</label></td>
-			<td><input type="password" name="Password"></td>
-		</tr>		
-	</table>
-	<br>
-	<input type="submit" value="Save settings"><br>
-</form>
-
 {{range .Site.Sunscreens}}	
 	<h2>Sunscreen {{.Name}}</h2>
 	<form action="/config/{{.Id}}" method="POST">
@@ -144,8 +89,59 @@
 	        <td><input type="number" name="LightNeutralThreshold" value="{{.Site.LightSensor.LightNeutralThreshold}}" required></td>
 	        <td><input type="number" name="LightBadThreshold" value="{{.Site.LightSensor.LightBadThreshold}}" required></td>
 		</tr>
+	<table>
+	<h2>Settings</h2>
+	<table>
+		<tr>
+			<td><b>Advanced</b></td>
+			<td><label for="RefreshRate">Website refresh rate (in minutes)</label></td>
+			<td><input type="number" name="RefreshRate" value="{{fminutes .Config.RefreshRate}}" required></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MoveHistory">Number of historical Movements</label></td>
+			<td><input type="number" name="MoveHistory" value="{{.Config.MoveHistory}}" required></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="LogRecords">Number Log records shown</label></td>
+			<td><input type="number" name="LogRecords" value="{{.Config.LogRecords}}" required></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="IpWhitelist">Whitelisted IPs (comma separated)</label></td>
+			<td><input type="text" name="IpWhitelist" value="{{fsliceString .Config.IpWhitelist}}"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="Port">Port (range: 1000-9999; requires reboot)</label></td>
+			<td><input type="text" name="Port" value="{{.Config.Port}}"></td>
+		</tr>
+		
+		<tr>
+			<td><b>E-mail</b></td>
+			<td><label for="EnableMail">EnableMail</label></td>
+			<td><input type="checkbox" name="EnableMail" value=true {{if eq .Config.EnableMail true}} checked {{end}}></td>		
+		</tr>
+		
+		<tr>
+			<td><b>Login</b></td>
+			<td><label for="Username">Username</label></td>
+			<td><input type="text" name="Username" value="{{.Config.Username}}" required></td>
+		</tr>		
+		<tr>
+			<td></td>
+			<td><label for="CurrentPassword">Current Password</label></td>
+			<td><input type="password" name="CurrentPassword"></td>
+		</tr>		
+		<tr>
+			<td></td>
+			<td><label for="Password">Password</label></td>
+			<td><input type="password" name="Password"></td>
+		</tr>		
 	</table>
-	<input type="submit" value="Save Light sensor"><br>
+	<br>
+	<input type="submit" value="Save settings"><br>
 </form>
 
 <p><a href="/">Click here to go back to home</a></p>
