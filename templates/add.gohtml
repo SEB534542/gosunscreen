@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add a Sunscreen</title>
+</head>
+<body>
+<h1>Add Sunscreen</h1>
+<form method="POST">
+		<table>
+			<tr>
+				<td><label for="Name">Sunscreen Name</label></td>
+				<td><input type="text" name="Name" required></td>
+			</tr>
+			<tr>
+				<td><label for="Start">Start time (hh:mm)</label></td>
+				<td><input type="time" name="Start" required></td>
+			</tr>
+			<tr>
+				<td><label for="Stop">Stop time (hh:mm)</label></td>
+				<td><input type="time" name="Stop" required></td>
+			</tr>
+			<tr>
+				<td><label for="StopThreshold">Stop Threshold (in minutes)</label></td>
+				<td><input type="number" name="StopThreshold" required></td>
+			</tr>
+			<tr>
+				<td><label for="DurDown">Seconds down</label></td>
+				<td><input type="number" name="DurDown" required></td>
+			</tr>
+			<tr>
+				<td><label for="DurUp">Seconds up</label></td>
+				<td><input type="number" name="DurUp" required></td>
+			</tr>
+			<tr>
+				<td><label for="PinDown">Pin for down</label></td>
+				<td><input type="number" name="PinDown" required></td>
+			</tr>
+			<tr>
+				<td><label for="PinUp">Pin for up</label></td>
+				<td><input type="number" name="PinUp" required></td>
+			</tr>
+		</table>
+		<br>
+		<input type="submit" value="Save {{.Name}}">
+	</form>
+</body>
+</html>

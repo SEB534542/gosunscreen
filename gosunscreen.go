@@ -199,6 +199,7 @@ func main() {
 	http.HandleFunc("/", handlerMain)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", handlerMode)
+	http.HandleFunc("/config/add/", handlerAddSunscreen)
 	http.HandleFunc("/config/", handlerConfig)
 	http.HandleFunc("/log/", handlerLog)
 	http.HandleFunc("/login", handlerLogin)
@@ -864,6 +865,26 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	err = tpl.ExecuteTemplate(w, "config.gohtml", data)
 	if err != nil {
 		log.Panic(err)
+	}
+}
+
+func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if req.Method == http.MethodPost {
+		// TODO: Check for duplicates in Name and pins?
+		// If duplicate give an error message and stay on page
+
+		http.Redirect(w, req, "/config", http.StatusSeeOther)
+		return
+	}
+
+	err := tpl.ExecuteTemplate(w, "add.gohtml", nil)
+	if err != nil {
+		log.Fatalln(err)
 	}
 }
 
