@@ -882,6 +882,13 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		// TODO: Check for duplicates in Name and pins?
 		// If duplicate give an error message and stay on page
+		id := 1000
+		for _, v := range site.Sunscreens {
+			if v.Id >= id {
+				id = v.Id + 1
+			}
+		}
+		s.Id = id
 
 		http.Redirect(w, req, "/config", http.StatusSeeOther)
 		return
