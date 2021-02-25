@@ -15,43 +15,8 @@
 
 {{range .Site.Sunscreens}}	
 	<h2>Sunscreen {{.Name}}</h2>
-	<form action="/config/{{.Id}}" method="POST">
-		<table>
-			<tr>
-				<td><label for="Name">Sunscreen Name</label></td>
-				<td><input type="text" name="Name" value="{{.Name}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="Start">Start time (hh:mm)</label></td>
-				<td><input type="time" name="Start" value="{{fdateHM .Start}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="Stop">Stop time (hh:mm)</label></td>
-				<td><input type="time" name="Stop" value="{{fdateHM .Stop}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="StopThreshold">Stop Threshold (in minutes)</label></td>
-				<td><input type="number" name="StopThreshold" value="{{fminutes .StopThreshold}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="DurDown">Seconds down</label></td>
-				<td><input type="number" name="DurDown" value="{{fseconds .DurDown}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="DurUp">Seconds up</label></td>
-				<td><input type="number" name="DurUp" value="{{fseconds .DurUp}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="PinDown">Pin for down</label></td>
-				<td><input type="number" name="PinDown" value="{{.PinDown}}" required></td>
-			</tr>
-			<tr>
-				<td><label for="PinUp">Pin for up</label></td>
-				<td><input type="number" name="PinUp" value="{{.PinUp}}" required></td>
-			</tr>
-		</table>
-		<br>
-		<input type="submit" value="Save Sunscreen {{.Name}}">
+	<form action="/config/edit/{{.Id}}" method="POST">
+		{{template "addSunscreen" .}}
 	</form>
 {{end}}
 
@@ -68,7 +33,7 @@
 		</tr>
     		<tr>
 			<td><label for="Interval">Interval in seconds</label></td>
-			<td><input type="number" name="Interval" value="{{fminutes .Site.LightSensor.Interval}}" required></td>
+			<td><input type="number" name="Interval" value="{{fseconds .Site.LightSensor.Interval}}" required></td>
 		</tr>
 		<tr>
 			<td><label for="LightFactor">Analog value correction</label></td>

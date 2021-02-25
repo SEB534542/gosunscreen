@@ -200,6 +200,7 @@ func main() {
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", handlerMode)
 	http.HandleFunc("/config/add/", handlerAddSunscreen)
+	http.HandleFunc("/config/edit/", handlerEditSunscreen)
 	http.HandleFunc("/config/", handlerConfig)
 	http.HandleFunc("/log/", handlerLog)
 	http.HandleFunc("/login", handlerLogin)
@@ -626,7 +627,8 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	idMode := req.URL.Path[len("/mode/"):]
 	id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
 	if err != nil {
-		// TODO: error handling msg to display
+		// TODO: change fatal into http error (as url is not correct)
+		//http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 		log.Fatalln(err)
 	}
 	mode := idMode[strings.Index(idMode, "/")+1:]
@@ -659,14 +661,32 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	http.Redirect(w, req, "/", http.StatusFound)
 }
 
+func handlerEditSunscreen(w http.ResponseWriter, req *http.Request) {
+	// Check if there is anything after "/config/edit/", i.e. the sunscreen ID
+	id, err := strconv.Atoi(req.URL.Path[len("/config/edit/"):])
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unknown sunscreen (%v)", id), http.StatusForbidden)
+	}
+
+	//			i, err := site.sIndex(id)
+	//			if err != nil {
+	//				log.Fatalln(err)
+	//			}
+	// TODO: validation error should result in a http error
+
+	// Todo: make validation of addSunscreen a func so can use it here as well (with msgs as output)
+	log.Println("Saved sunscreen")
+	http.Redirect(w, req, "/config", http.StatusSeeOther)
+}
+
 func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
 
-	// TODO: create handler for adding and deleting a sunscreen
-	// Delete: <a href=“/config/{{.Id}}/delete”><button>Delete {{.Name}}</button></a>
+	// TODO: create handler for deleting a sunscreen
+	// Delete: <a href=“/config/delete”><button>Delete {{.Name}}</button></a>
 
 	var err error
 	// TODO: Change msgs to []error ?
@@ -700,15 +720,15 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		// Read, validate and store light sensor
 		lightGoodValue, err := strToInt(req.PostFormValue("LightGoodValue"))
 		if err != nil {
-			log.Fatalln(err)
+			appendMsgs(fmt.Sprintf("Unable to save LightGoodValue: %v", err))
 		}
 		lightNeutralValue, err := strToInt(req.PostFormValue("LightNeutralValue"))
 		if err != nil {
-			log.Fatalln(err)
+			appendMsgs(fmt.Sprintf("Unable to save LightNeutralValue: %v", err))
 		}
 		lightBadValue, err := strToInt(req.PostFormValue("LightBadValue"))
 		if err != nil {
-			log.Fatalln(err)
+			appendMsgs(fmt.Sprintf("Unable to save LightBadValue: %v", err))
 		}
 		if (lightGoodValue < lightNeutralValue && lightNeutralValue < lightBadValue) && err == nil {
 			site.LightSensor.LightGoodValue = lightGoodValue
@@ -837,7 +857,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 				appendMsgs(fmt.Sprintf("New password saved"))
 			}
 		}
-
 		var msg string
 		if len(msgs) == 0 {
 			msg = "Saved configuration"
@@ -890,6 +909,7 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		// Durations > 0
 		// Start > Stop
 		id := 1000
+		mu.Lock()
 		for _, v := range site.Sunscreens {
 			if v.Id >= id {
 				id = v.Id + 1
@@ -897,7 +917,6 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		}
 		s.Id = id
 		s.Name = req.PostFormValue("Name")
-
 		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
@@ -942,16 +961,19 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if len(msgs) == 0 {
-			mu.Lock()
+			s.Mode = manual
+			s.Position = up
 			site.Sunscreens = append(site.Sunscreens, s)
+			SaveToJson(site, siteFile)
+			log.Println("Added new sunscreen")
 			mu.Unlock()
 			http.Redirect(w, req, "/config", http.StatusSeeOther)
 			return
 		} else {
 			appendMsgs("Unable to save Sunscreen, please correct errors")
 		}
+		mu.Unlock()
 	}
-
 	data := struct {
 		*Sunscreen
 		Msgs []string
@@ -959,7 +981,6 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		s,
 		msgs,
 	}
-
 	err := tpl.ExecuteTemplate(w, "add.gohtml", data)
 	if err != nil {
 		log.Panic(err)
