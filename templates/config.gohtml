@@ -68,7 +68,7 @@
 		</tr>
     		<tr>
 			<td><label for="Interval">Interval in seconds</label></td>
-			<td><input type="number" name="Interval" value="{{.Site.LightSensor.Interval}}" required></td>
+			<td><input type="number" name="Interval" value="{{fminutes .Site.LightSensor.Interval}}" required></td>
 		</tr>
 		<tr>
 			<td><label for="LightFactor">Analog value correction</label></td>
@@ -142,7 +142,7 @@
 		</tr>		
 	</table>
 	<br>
-	<input type="submit" value="Save settings"><br>
+	<input type="submit" value="Save"><br>
 </form>
 
 <p><a href="/">Click here to go back to home</a></p>

@@ -693,76 +693,93 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		//		// 	log.Fatalln(err)
 		//		// }
 
+		if site.LightSensor == nil {
+			site.LightSensor = &LightSensor{}
+		}
+
 		// Read, validate and store light sensor
-		// Light values
-		//		lightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		lightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		lightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		if (lightGoodValue < lightNeutralValue && lightNeutralValue < lightBadValue) || err == nil {
-		//			site.LightSensor.LightGoodValue = lightGoodValue
-		//			site.LightSensor.LightNeutralValue = lightNeutralValue
-		//			site.LightSensor.LightBadValue = lightBadValue
-		//		} else {
-		//			if err != nil {
-		//				msg := fmt.Sprintf("Error while reading light values: %v", err)
-		//			} else {
-		//				msg := fmt.Sprintf("Light values incorrect, (good<neutral<bad): %v<%v<%v", lightGoodValue, lightNeutralValue, lightBadValue)
-		//			}
-		//			msgs = append(msgs, msg)
-		//			log.Println(msg)
-		//		}
+		lightGoodValue, err := strToInt(req.PostFormValue("LightGoodValue"))
+		if err != nil {
+			log.Fatalln(err)
+		}
+		lightNeutralValue, err := strToInt(req.PostFormValue("LightNeutralValue"))
+		if err != nil {
+			log.Fatalln(err)
+		}
+		lightBadValue, err := strToInt(req.PostFormValue("LightBadValue"))
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if (lightGoodValue < lightNeutralValue && lightNeutralValue < lightBadValue) && err == nil {
+			site.LightSensor.LightGoodValue = lightGoodValue
+			site.LightSensor.LightNeutralValue = lightNeutralValue
+			site.LightSensor.LightBadValue = lightBadValue
+		} else {
+			if err != nil {
+				appendMsgs(fmt.Sprintf("Error while reading light values: %v", err))
+			} else {
+				appendMsgs(fmt.Sprintf("Light values incorrect, (good<neutral<bad): %v<%v<%v", lightGoodValue, lightNeutralValue, lightBadValue))
+			}
+		}
 
-		// REVIEW & REMOVE
-		//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//
-		//		if req.PostFormValue("EnableMail") == "" {
-		//			config.EnableMail = false
-		//		} else {
-		//			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
-		//			if err != nil {
-		//				log.Fatalln(err)
-		//			}
-		//		}
-		//
-		//
-		//		config.Notes = req.PostFormValue("Notes")
+		// Light Threshold
+		{
+			min := 5
+			lightGoodThreshold, err := strToInt(req.PostFormValue("LightGoodThreshold"))
+			if err != nil {
+				appendMsgs(fmt.Sprintf("Error reading LightGoodThreshold: %v", err))
+			} else {
+				if lightGoodThreshold < min {
+					appendMsgs(fmt.Sprintf("lightGoodThreshold should be minimum %v (was %v)", min, lightGoodThreshold))
+					lightGoodThreshold = min
+				}
+				site.LightSensor.LightGoodThreshold = lightGoodThreshold
+			}
+			lightNeutralThreshold, err := strToInt(req.PostFormValue("LightNeutralThreshold"))
+			if err != nil {
+				appendMsgs(fmt.Sprintf("Error reading LightNeutralThreshold: %v", err))
+			} else {
+				if lightNeutralThreshold < min {
+					appendMsgs(fmt.Sprint("lightNeutralThreshold should be minimum %v (was %v)", min, lightNeutralThreshold))
+					lightNeutralThreshold = min
+				}
+				site.LightSensor.LightNeutralThreshold = lightNeutralThreshold
+			}
+			lightBadThreshold, err := strToInt(req.PostFormValue("LightBadThreshold"))
+			if err != nil {
+				appendMsgs(fmt.Sprintf("Error reading LightBadThreshold: %v", err))
+			} else {
+				if lightBadThreshold < min {
+					appendMsgs(fmt.Sprint("lightBadThreshold should be minimum %v (was %v)", min, lightBadThreshold))
+					lightBadThreshold = min
+				}
+				site.LightSensor.LightBadThreshold = lightBadThreshold
+			}
+		}
 
-		//		config.IpWhitelist = func(s string) []string {
-		//			xs := strings.Split(s, ",")
-		//			for i, v := range xs {
-		//				xs[i] = strings.Trim(v, " ")
-		//			}
-		//			return xs
-		//		}(req.PostFormValue("IpWhitelist"))
-
-		//		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
+		site.LightSensor.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Error reading AllowedOutliers: %v", err))
+		}
+		lightFactor, err := strToInt(req.PostFormValue("LightFactor"))
+		if err != nil || lightFactor == 0 {
+			appendMsgs(fmt.Sprintf("LightFactor (%v) should a number greater than zero: %v", lightFactor, err))
+		} else {
+			site.LightSensor.LightFactor = lightFactor
+		}
+		pin, err := strToInt(req.PostFormValue("PinLight"))
+		if !(pin > 0 && pin < 28) || err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pin, err))
+		} else {
+			site.LightSensor.PinLight = rpio.Pin(pin)
+		}
+		interval, err := time.ParseDuration(req.PostFormValue("Interval") + "s")
+		var min float64 = 10.0
+		if err != nil || interval.Seconds() < min {
+			appendMsgs(fmt.Sprintf("Unable to save Interval '%v', should be minimal %v seconds (%v)", interval, min, err))
+		} else {
+			site.LightSensor.Interval = interval
+		}
 
 		// Read, validate and store config
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
@@ -790,7 +807,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 			}
 			return xs
 		}(req.PostFormValue("IpWhitelist"))
-		port, err := seb.StrToIntZ(req.PostFormValue("Port"))
+		port, err := strToInt(req.PostFormValue("Port"))
 		if err != nil || !(port >= 1000 && port <= 9999) {
 			appendMsgs(fmt.Sprintf("Unable to save port '%v', should be within range 1000-9999 (%v)", port, err))
 		} else {
