@@ -671,6 +671,10 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	var err error
 	// TODO: Change msgs to []error ?
 	var msgs []string
+	appendMsgs := func(msg string) {
+		msgs = append(msgs, msg)
+		log.Println(msg)
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -690,22 +694,34 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		//		// }
 
 		// Read, validate and store light sensor
-		lightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		// Validate all values and all thresholds
-		site.LightSensor.LightGoodValue
-
-		//		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
+		// Light values
+		//		lightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
 		//		if err != nil {
 		//			log.Fatalln(err)
 		//		}
-		//		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
+		//		lightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
 		//		if err != nil {
 		//			log.Fatalln(err)
 		//		}
+		//		lightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		if (lightGoodValue < lightNeutralValue && lightNeutralValue < lightBadValue) || err == nil {
+		//			site.LightSensor.LightGoodValue = lightGoodValue
+		//			site.LightSensor.LightNeutralValue = lightNeutralValue
+		//			site.LightSensor.LightBadValue = lightBadValue
+		//		} else {
+		//			if err != nil {
+		//				msg := fmt.Sprintf("Error while reading light values: %v", err)
+		//			} else {
+		//				msg := fmt.Sprintf("Light values incorrect, (good<neutral<bad): %v<%v<%v", lightGoodValue, lightNeutralValue, lightBadValue)
+		//			}
+		//			msgs = append(msgs, msg)
+		//			log.Println(msg)
+		//		}
+
+		// REVIEW & REMOVE
 		//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
 		//		if err != nil {
 		//			log.Fatalln(err)
@@ -751,25 +767,19 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		// Read, validate and store config
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 		if err != nil {
-			msg := fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err)
-			msgs = append(msgs, msg)
-			log.Println(msg)
+			appendMsgs(fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err))
 		} else {
 			config.RefreshRate = refreshRate
 		}
 		moveHistory, err := strToInt(req.PostFormValue("MoveHistory"))
 		if err != nil {
-			msg := fmt.Sprintf("Unable to save MoveHistory (%v)", err)
-			msgs = append(msgs, msg)
-			log.Println(msg)
+			appendMsgs(fmt.Sprintf("Unable to save MoveHistory (%v)", err))
 		} else {
 			config.MoveHistory = moveHistory
 		}
 		logRecords, err := strToInt(req.PostFormValue("LogRecords"))
 		if err != nil {
-			msg := fmt.Sprintf("Unable to save LogRecords (%v)", err)
-			msgs = append(msgs, msg)
-			log.Println(msg)
+			appendMsgs(fmt.Sprintf("Unable to save LogRecords (%v)", err))
 		} else {
 			config.LogRecords = logRecords
 		}
@@ -782,9 +792,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		}(req.PostFormValue("IpWhitelist"))
 		port, err := seb.StrToIntZ(req.PostFormValue("Port"))
 		if err != nil || !(port >= 1000 && port <= 9999) {
-			msg := fmt.Sprintf("Unable to save port '%v', should be within range 1000-9999 (%v)", port, err)
-			msgs = append(msgs, msg)
-			log.Println(msg)
+			appendMsgs(fmt.Sprintf("Unable to save port '%v', should be within range 1000-9999 (%v)", port, err))
 		} else {
 			config.Port = port
 		}
@@ -797,27 +805,19 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		if req.PostFormValue("Username") != "" && req.PostFormValue("Username") != config.Username {
 			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
 			if err != nil {
-				msg := fmt.Sprintf("Current password is incorrect, username has not been updated")
-				msgs = append(msgs, msg)
-				log.Println(msg)
+				appendMsgs(fmt.Sprintf("Current password is incorrect, username has not been updated"))
 			} else {
 				config.Username = req.PostFormValue("Username")
-				msg := fmt.Sprintf("New username saved")
-				msgs = append(msgs, msg)
-				log.Println(msg)
+				appendMsgs(fmt.Sprintf("New username saved"))
 			}
 		}
 		if req.PostFormValue("Password") != "" {
 			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
 			if err != nil {
-				msg := fmt.Sprintf("Current password is incorrect, password has not been updated")
-				msgs = append(msgs, msg)
-				log.Println(msg)
+				appendMsgs(fmt.Sprintf("Current password is incorrect, password has not been updated"))
 			} else {
 				config.Password, _ = bcrypt.GenerateFromPassword([]byte(req.PostFormValue("Password")), bcrypt.MinCost)
-				msg := fmt.Sprintf("New password saved")
-				msgs = append(msgs, msg)
-				log.Println(msg)
+				appendMsgs(fmt.Sprintf("New password saved"))
 			}
 		}
 
@@ -827,8 +827,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		} else {
 			msg = "Saved the rest"
 		}
-		msgs = append(msgs, msg)
-		log.Println(msg)
+		appendMsgs(msg)
 
 		SaveToJson(config, configFile)
 		SaveToJson(site, siteFile)
