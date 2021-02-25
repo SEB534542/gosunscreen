@@ -5,6 +5,9 @@
     <title>Add a Sunscreen</title>
 </head>
 <body>
+{{range .Msgs}}
+	<i>{{.}}</i><br>
+{{end}}
 <h1>Add Sunscreen</h1>
 	<form method="POST">
 		<table>

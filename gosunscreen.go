@@ -879,9 +879,16 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var s = &Sunscreen{}
+	var msgs []string
+	appendMsgs := func(msg string) {
+		msgs = append(msgs, msg)
+		log.Println(msg)
+	}
 	if req.Method == http.MethodPost {
-		// TODO: Check for duplicates in Name and pins?
-		// If duplicate give an error message and stay on page
+		// TODO: include validations
+		// Check for duplicates in Name and pins
+		// Durations > 0
+		// Start > Stop
 		id := 1000
 		for _, v := range site.Sunscreens {
 			if v.Id >= id {
@@ -889,14 +896,73 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		s.Id = id
+		s.Name = req.PostFormValue("Name")
 
-		http.Redirect(w, req, "/config", http.StatusSeeOther)
-		return
+		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
+		} else {
+			s.Start = start
+		}
+		stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
+		} else {
+			s.Stop = stop
+		}
+		stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save StopThreshold '%v' (%v)", stopThreshold, err))
+		} else {
+			s.StopThreshold = stopThreshold
+		}
+		durDown, err := time.ParseDuration(req.PostFormValue("DurDown") + "s")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save DurDown '%v' (%v)", durDown, err))
+		} else {
+			s.DurDown = durDown
+		}
+		durUp, err := time.ParseDuration(req.PostFormValue("DurUp") + "s")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save DurUp '%v' (%v)", durUp, err))
+		} else {
+			s.DurUp = durUp
+		}
+		pinDown, err := strToInt(req.PostFormValue("PinDown"))
+		if !(pinDown > 0 && pinDown < 28) || err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinDown, err))
+		} else {
+			s.PinDown = rpio.Pin(pinDown)
+		}
+		pinUp, err := strToInt(req.PostFormValue("PinUp"))
+		if !(pinUp > 0 && pinUp < 28) || err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinUp, err))
+		} else {
+			s.PinUp = rpio.Pin(pinUp)
+		}
+
+		if len(msgs) == 0 {
+			mu.Lock()
+			site.Sunscreens = append(site.Sunscreens, s)
+			mu.Unlock()
+			http.Redirect(w, req, "/config", http.StatusSeeOther)
+			return
+		} else {
+			appendMsgs("Unable to save Sunscreen, please correct errors")
+		}
 	}
 
-	err := tpl.ExecuteTemplate(w, "add.gohtml", s)
+	data := struct {
+		*Sunscreen
+		Msgs []string
+	}{
+		s,
+		msgs,
+	}
+
+	err := tpl.ExecuteTemplate(w, "add.gohtml", data)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panic(err)
 	}
 }
 
