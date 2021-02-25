@@ -669,6 +669,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	// Delete: <a href=“/config/{{.Id}}/delete”><button>Delete {{.Name}}</button></a>
 
 	var err error
+	// TODO: Change msgs to []error ?
 	var msgs []string
 
 	mu.Lock()
@@ -688,7 +689,66 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		//		// 	log.Fatalln(err)
 		//		// }
 
-		// Read and store config
+		// Read, validate and store light sensor
+		lightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		// Validate all values and all thresholds
+		site.LightSensor.LightGoodValue
+
+		//		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+		//
+		//		if req.PostFormValue("EnableMail") == "" {
+		//			config.EnableMail = false
+		//		} else {
+		//			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
+		//			if err != nil {
+		//				log.Fatalln(err)
+		//			}
+		//		}
+		//
+		//
+		//		config.Notes = req.PostFormValue("Notes")
+
+		//		config.IpWhitelist = func(s string) []string {
+		//			xs := strings.Split(s, ",")
+		//			for i, v := range xs {
+		//				xs[i] = strings.Trim(v, " ")
+		//			}
+		//			return xs
+		//		}(req.PostFormValue("IpWhitelist"))
+
+		//		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
+		//		if err != nil {
+		//			log.Fatalln(err)
+		//		}
+
+		// Read, validate and store config
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 		if err != nil {
 			msg := fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err)
@@ -761,78 +821,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		// TODO: Read and store lightsensor (in same for?)
-
-		//		config.Sunrise, err = StoTime(req.PostFormValue("Sunrise"), 0)
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.Sunset, err = StoTime(req.PostFormValue("Sunset"), 0)
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.SunsetThreshold, err = strToInt(req.PostFormValue("SunsetThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.Interval, err = strToInt(req.PostFormValue("Interval"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightGoodValue, err = strToInt(req.PostFormValue("LightGoodValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightGoodThreshold, err = strToInt(req.PostFormValue("LightGoodThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightNeutralValue, err = strToInt(req.PostFormValue("LightNeutralValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightNeutralThreshold, err = strToInt(req.PostFormValue("LightNeutralThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightBadValue, err = strToInt(req.PostFormValue("LightBadValue"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.LightBadThreshold, err = strToInt(req.PostFormValue("LightBadThreshold"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//		config.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-		//
-		//		if req.PostFormValue("EnableMail") == "" {
-		//			config.EnableMail = false
-		//		} else {
-		//			config.EnableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
-		//			if err != nil {
-		//				log.Fatalln(err)
-		//			}
-		//		}
-		//
-		//
-		//		config.Notes = req.PostFormValue("Notes")
-
-		//		config.IpWhitelist = func(s string) []string {
-		//			xs := strings.Split(s, ",")
-		//			for i, v := range xs {
-		//				xs[i] = strings.Trim(v, " ")
-		//			}
-		//			return xs
-		//		}(req.PostFormValue("IpWhitelist"))
-
-		//		config.LightFactor, err = strToInt(req.PostFormValue("LightFactor"))
-		//		if err != nil {
-		//			log.Fatalln(err)
-		//		}
-
 		var msg string
 		if len(msgs) == 0 {
 			msg = "Saved configuration"
@@ -874,6 +862,7 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	var s = &Sunscreen{}
 	if req.Method == http.MethodPost {
 		// TODO: Check for duplicates in Name and pins?
 		// If duplicate give an error message and stay on page
@@ -882,7 +871,7 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err := tpl.ExecuteTemplate(w, "add.gohtml", nil)
+	err := tpl.ExecuteTemplate(w, "add.gohtml", s)
 	if err != nil {
 		log.Fatalln(err)
 	}
