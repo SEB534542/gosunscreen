@@ -666,17 +666,31 @@ func handlerEditSunscreen(w http.ResponseWriter, req *http.Request) {
 	id, err := strconv.Atoi(req.URL.Path[len("/config/edit/"):])
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unknown sunscreen (%v)", id), http.StatusForbidden)
+		return
 	}
+	mu.Lock()
+	i, err := site.sIndex(id)
+	if err != nil {
+		mu.Unlock()
+		http.Error(w, fmt.Sprintf("Unknown sunscreen (%v)", id), http.StatusForbidden)
+		return
+	}
+	msgs := site.Sunscreens[i].processReq(req)
+	if len(msgs) == 0 {
+		SaveToJson(site, siteFile)
+		log.Println("Saved sunscreen")
+		mu.Unlock()
+		http.Redirect(w, req, "/config", http.StatusSeeOther)
+		return
+	} else {
+		msg := "Unable to save Sunscreen, please correct errors"
+		msgs = append(msgs, msg)
+		log.Println(msg)
+		http.Error(w, strings.Join(msgs, "\n"), http.StatusForbidden)
+		return
+	}
+	mu.Unlock()
 
-	//			i, err := site.sIndex(id)
-	//			if err != nil {
-	//				log.Fatalln(err)
-	//			}
-	// TODO: validation error should result in a http error
-
-	// Todo: make validation of addSunscreen a func so can use it here as well (with msgs as output)
-	log.Println("Saved sunscreen")
-	http.Redirect(w, req, "/config", http.StatusSeeOther)
 }
 
 func handlerConfig(w http.ResponseWriter, req *http.Request) {
@@ -699,24 +713,9 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	mu.Lock()
 	defer mu.Unlock()
 	if req.Method == http.MethodPost {
-		//		// TODO: check if there is anything after "/config/", ie the sunscreen ID
-		//		// idMode := req.URL.Path[len("/mode/"):]
-		//		// id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
-		//		// if err != nil {
-		//		// 	// TODO: error handling msg to display
-		//		// 	log.Fatalln(err)
-		//		// }
-		//		// mode := idMode[strings.Index(idMode, "/")+1:]
-		//		// i, err := site.sIndex(id)
-		//		// if err != nil {
-		//		// 	// TODO: error handling msg to display
-		//		// 	log.Fatalln(err)
-		//		// }
-
 		if site.LightSensor == nil {
 			site.LightSensor = &LightSensor{}
 		}
-
 		// Read, validate and store light sensor
 		lightGoodValue, err := strToInt(req.PostFormValue("LightGoodValue"))
 		if err != nil {
@@ -741,7 +740,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 				appendMsgs(fmt.Sprintf("Light values incorrect, (good<neutral<bad): %v<%v<%v", lightGoodValue, lightNeutralValue, lightBadValue))
 			}
 		}
-
 		// Light Threshold
 		{
 			min := 5
@@ -776,7 +774,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 				site.LightSensor.LightBadThreshold = lightBadThreshold
 			}
 		}
-
 		site.LightSensor.AllowedOutliers, err = strToInt(req.PostFormValue("AllowedOutliers"))
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Error reading AllowedOutliers: %v", err))
@@ -800,7 +797,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		} else {
 			site.LightSensor.Interval = interval
 		}
-
 		// Read, validate and store config
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 		if err != nil {
@@ -916,50 +912,7 @@ func handlerAddSunscreen(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 		s.Id = id
-		s.Name = req.PostFormValue("Name")
-		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
-		} else {
-			s.Start = start
-		}
-		stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
-		} else {
-			s.Stop = stop
-		}
-		stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save StopThreshold '%v' (%v)", stopThreshold, err))
-		} else {
-			s.StopThreshold = stopThreshold
-		}
-		durDown, err := time.ParseDuration(req.PostFormValue("DurDown") + "s")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save DurDown '%v' (%v)", durDown, err))
-		} else {
-			s.DurDown = durDown
-		}
-		durUp, err := time.ParseDuration(req.PostFormValue("DurUp") + "s")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save DurUp '%v' (%v)", durUp, err))
-		} else {
-			s.DurUp = durUp
-		}
-		pinDown, err := strToInt(req.PostFormValue("PinDown"))
-		if !(pinDown > 0 && pinDown < 28) || err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinDown, err))
-		} else {
-			s.PinDown = rpio.Pin(pinDown)
-		}
-		pinUp, err := strToInt(req.PostFormValue("PinUp"))
-		if !(pinUp > 0 && pinUp < 28) || err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinUp, err))
-		} else {
-			s.PinUp = rpio.Pin(pinUp)
-		}
-
+		s.processReq(req)
 		if len(msgs) == 0 {
 			s.Mode = manual
 			s.Position = up
@@ -1211,4 +1164,56 @@ func (site *Site) sIndex(id int) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("Id %v not found", id)
+}
+
+func (s *Sunscreen) processReq(req *http.Request) []string {
+	var msgs []string
+	appendMsgs := func(msg string) {
+		msgs = append(msgs, msg)
+		log.Println(msg)
+	}
+	s.Name = req.PostFormValue("Name")
+	start, err := seb.StoTime(req.PostFormValue("Start"), 0)
+	if err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
+	} else {
+		s.Start = start
+	}
+	stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
+	if err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
+	} else {
+		s.Stop = stop
+	}
+	stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
+	if err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save StopThreshold '%v' (%v)", stopThreshold, err))
+	} else {
+		s.StopThreshold = stopThreshold
+	}
+	durDown, err := time.ParseDuration(req.PostFormValue("DurDown") + "s")
+	if err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save DurDown '%v' (%v)", durDown, err))
+	} else {
+		s.DurDown = durDown
+	}
+	durUp, err := time.ParseDuration(req.PostFormValue("DurUp") + "s")
+	if err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save DurUp '%v' (%v)", durUp, err))
+	} else {
+		s.DurUp = durUp
+	}
+	pinDown, err := strToInt(req.PostFormValue("PinDown"))
+	if !(pinDown > 0 && pinDown < 28) || err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinDown, err))
+	} else {
+		s.PinDown = rpio.Pin(pinDown)
+	}
+	pinUp, err := strToInt(req.PostFormValue("PinUp"))
+	if !(pinUp > 0 && pinUp < 28) || err != nil {
+		appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinUp, err))
+	} else {
+		s.PinUp = rpio.Pin(pinUp)
+	}
+	return msgs
 }
