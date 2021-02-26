@@ -18,6 +18,7 @@
 	<form action="/config/edit/{{.Id}}" method="POST">
 		{{template "addSunscreen" .}}
 	</form>
+	<a href=delete/{{.Id}}><button>Delete {{.Name}}</button></a>
 {{end}}
 
 <h2>Light sensor</h2>
@@ -89,7 +90,36 @@
 			<td><label for="EnableMail">EnableMail</label></td>
 			<td><input type="checkbox" name="EnableMail" value=true {{if eq .Config.EnableMail true}} checked {{end}}></td>		
 		</tr>
-		
+		<tr>
+			<td></td>
+			<td><label for="MailFrom">E-mail address</label></td>
+			<td><input type="email" name="MailFrom" value={{.Config.MailFrom}}></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MailUser">E-mail Username</label></td>
+			<td><input type="text" name="MailUser" value={{.Config.MailUser}}></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MailPass">E-mail Password</label></td>
+			<td><input type="password" name="MailPass"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MailHost">E-mail host</label></td>
+			<td><input type="text" name="MailHost" value={{.Config.MailHost}}></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MailPort">E-mail host port</label></td>
+			<td><input type="number" name="MailPort" value={{.Config.MailPort}}></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="MailTo">E-mail recipients (comma separated)</label></td>
+			<td><input type="text" name="MailTo" value={{fsliceString .Config.MailTo}}></td>
+		</tr>
 		<tr>
 			<td><b>Login</b></td>
 			<td><label for="Username">Username</label></td>

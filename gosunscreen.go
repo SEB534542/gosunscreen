@@ -61,13 +61,19 @@ type Site struct {
 
 type Config struct {
 	RefreshRate time.Duration // Number of seconds the main page should refresh
-	EnableMail  bool          // Enable mail functionality
 	MoveHistory int           // Number of sunscreen movements to be shown
 	LogRecords  int           // Number of log records that are shown
 	Username    string        // Username for logging in
 	Password    []byte        // Password for logging in
 	IpWhitelist []string      // Whitelisted IPs
-	Port        int
+	Port        int           // Port of the localhost
+	EnableMail  bool          // Enable mail functionality
+	MailFrom    string        // E-mail address from, often same as username
+	MailUser    string        // E-mail Username
+	MailPass    string        // E-mail Password
+	MailTo      []string      // E-mail to
+	MailHost    string        // E-mail host
+	MailPort    int           // E-mail host port
 }
 
 // General constants
@@ -201,6 +207,7 @@ func main() {
 	http.HandleFunc("/mode/", handlerMode)
 	http.HandleFunc("/config/add/", handlerAddSunscreen)
 	http.HandleFunc("/config/edit/", handlerEditSunscreen)
+	http.HandleFunc("/config/delete/", handlerDeleteSunscreen)
 	http.HandleFunc("/config/", handlerConfig)
 	http.HandleFunc("/log/", handlerLog)
 	http.HandleFunc("/login", handlerLogin)
@@ -690,7 +697,29 @@ func handlerEditSunscreen(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	mu.Unlock()
+}
 
+func handlerDeleteSunscreen(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := strconv.Atoi(req.URL.Path[len("/config/delete/"):])
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unknown sunscreen (%v)", id), http.StatusForbidden)
+		return
+	}
+	mu.Lock()
+	i, err := site.sIndex(id)
+	if err != nil {
+		mu.Unlock()
+		http.Error(w, fmt.Sprintf("Unknown sunscreen (%v)", id), http.StatusForbidden)
+		return
+	}
+	site.Sunscreens = append(site.Sunscreens[:i], site.Sunscreens[i+1:]...)
+	mu.Unlock()
+	http.Redirect(w, req, "/config", http.StatusSeeOther)
+	return
 }
 
 func handlerConfig(w http.ResponseWriter, req *http.Request) {
@@ -699,15 +728,19 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// TODO: create handler for deleting a sunscreen
-	// Delete: <a href=“/config/delete”><button>Delete {{.Name}}</button></a>
-
 	var err error
 	// TODO: Change msgs to []error ?
 	var msgs []string
 	appendMsgs := func(msg string) {
 		msgs = append(msgs, msg)
 		log.Println(msg)
+	}
+	stringToSlice := func(s string) []string {
+		xs := strings.Split(s, ",")
+		for i, v := range xs {
+			xs[i] = strings.Trim(v, " ")
+		}
+		return xs
 	}
 
 	mu.Lock()
@@ -816,24 +849,12 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		} else {
 			config.LogRecords = logRecords
 		}
-		config.IpWhitelist = func(s string) []string {
-			xs := strings.Split(s, ",")
-			for i, v := range xs {
-				xs[i] = strings.Trim(v, " ")
-			}
-			return xs
-		}(req.PostFormValue("IpWhitelist"))
+		config.IpWhitelist = stringToSlice(req.PostFormValue("IpWhitelist"))
 		port, err := strToInt(req.PostFormValue("Port"))
 		if err != nil || !(port >= 1000 && port <= 9999) {
 			appendMsgs(fmt.Sprintf("Unable to save port '%v', should be within range 1000-9999 (%v)", port, err))
 		} else {
 			config.Port = port
-		}
-		if req.PostFormValue("EnableMail") == "" {
-			config.EnableMail = false
-		} else {
-			//enableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
-			config.EnableMail = true
 		}
 		if req.PostFormValue("Username") != "" && req.PostFormValue("Username") != config.Username {
 			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
@@ -853,6 +874,27 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 				appendMsgs(fmt.Sprintf("New password saved"))
 			}
 		}
+		// Mail config
+		if req.PostFormValue("EnableMail") == "" {
+			config.EnableMail = false
+		} else {
+			//enableMail, err = strconv.ParseBool(req.PostFormValue("EnableMail"))
+			config.EnableMail = true
+		}
+		config.MailFrom = req.PostFormValue("MailFrom")
+		config.MailUser = req.PostFormValue("MailUser")
+		if req.PostFormValue("MailPass") != "" {
+			config.MailPass = req.PostFormValue("MailPass")
+		}
+		config.MailTo = stringToSlice(req.PostFormValue("IpWhitelist"))
+		config.MailHost = req.PostFormValue("MailHost")
+		mailPort, err := strToInt(req.PostFormValue("MailPort"))
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save mail port: %v", err))
+		} else {
+			config.MailPort = mailPort
+		}
+
 		var msg string
 		if len(msgs) == 0 {
 			msg = "Saved configuration"
@@ -1045,11 +1087,13 @@ func sendMail(subj, body string) {
 			"\r\n" + body + "\r\n")
 
 		// Set up authentication information.
-		auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+		// auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+		auth := smtp.PlainAuth("", config.MailUser, config.MailPass, config.MailHost)
 
 		// Connect to the server, authenticate, set the sender and recipient,
 		// and send the email all in one step.
-		err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+		// err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
+		err := smtp.SendMail(fmt.Sprintf("%v:%v", config.MailHost, config.MailPort), auth, config.MailFrom, config.MailTo, msg)
 		if err != nil {
 			log.Fatal(err)
 		}
