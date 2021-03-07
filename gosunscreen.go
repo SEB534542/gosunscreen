@@ -22,8 +22,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: 1 lightsensor met meerdere zonneschermen, waarbij een zonnescherm zn eigen begin en eindtijd heeft (en de lichtgegevens meet)
-
 // LightSensor represents a physical lightsensor for which data can be collected through the corresponding GPIO pin.
 type LightSensor struct {
 	PinLight              rpio.Pin      // pin for retrieving light value
@@ -110,20 +108,6 @@ var (
 	config     Config
 )
 
-// // TODO: Remove ls1 en s1
-// var s = &LightSensor{
-// 	PinLight: rpio.Pin(23),
-// 	Data:     []int{},
-// }
-// var s1 = &Sunscreen{
-// 	Mode:     manual,
-// 	Position: up,
-// 	secDown:  17,
-// 	secUp:    20,
-// 	PinDown:  rpio.Pin(21),
-// 	PinUp:    rpio.Pin(20),
-// }
-
 func init() {
 	//Loading gohtml templates
 	tpl = template.Must(template.New("").Funcs(fm).ParseGlob("./templates/*"))
@@ -140,22 +124,21 @@ func init() {
 }
 
 func main() {
-	// TODO: include below lines
 	// Open logfile or create if not exists
-	//	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	//	if err != nil {
-	//		log.Panic("Error opening log file:", err)
-	//	}
-	//	defer f.Close()
-	//	log.SetOutput(f)
+	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Panic("Error opening log file:", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
 
 	log.Println("--------Start of program--------")
 
 	// Load general config
-	err := seb.LoadConfig(configFile, &config)
+	err = seb.LoadConfig(configFile, &config)
 	checkErr(err)
 	if config.Port == 0 {
-		config.Port = 8080
+		config.Port = 8081
 		log.Printf("Unable to load port, set port to default (%v)", config.Port)
 	}
 	if config.Username == "" {
@@ -185,17 +168,20 @@ func main() {
 	rpio.Open()
 	defer rpio.Close()
 
-	// TODO: remove below(?) / rewrite for all
-	//	for _, pin := range []rpio.Pin{s1.PinDown, s1.PinUp} {
-	//		pin.Output()
-	//		pin.High()
-	//	}
-	//	defer func() {
-	//		log.Println("Closing down...")
-	//		mu.Lock()
-	//		s.Up()
-	//		mu.Unlock()
-	//	}()
+	// Set Sunscreen pins
+	for _, s := range site.Sunscreens {
+		s.PinDown.Output()
+		s.PinDown.High()
+		s.PinUp.Output()
+		s.PinUp.High()
+
+		defer func() {
+			log.Println("Closing down...")
+			mu.Lock()
+			s.Up()
+			mu.Unlock()
+		}()
+	}
 
 	// Monitor light
 	if site.LightSensor != nil {
@@ -634,15 +620,14 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	idMode := req.URL.Path[len("/mode/"):]
 	id, err := strconv.Atoi(idMode[:strings.Index(idMode, "/")])
 	if err != nil {
-		// TODO: change fatal into http error (as url is not correct)
-		//http.Error(w, "Username and/or password do not match", http.StatusForbidden)
-		log.Fatalln(err)
+		http.Error(w, "Unknown Sunscreen Id", http.StatusForbidden)
+		return
 	}
 	mode := idMode[strings.Index(idMode, "/")+1:]
 	i, err := site.sIndex(id)
 	if err != nil {
-		// TODO: error handling msg to display
-		log.Fatalln(err)
+		http.Error(w, "Unknown Sunscreen Id", http.StatusForbidden)
+		return
 	}
 	mu.Lock()
 	switch mode {
@@ -729,7 +714,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var err error
-	// TODO: Change msgs to []error ?
 	var msgs []string
 	appendMsgs := func(msg string) {
 		msgs = append(msgs, msg)
@@ -1069,13 +1053,10 @@ func seconds(d time.Duration) string {
 
 // SendMail sends mail to
 func sendMail(subj, body string) {
-	// TODO: add mail config to var config
 	if config.EnableMail {
-		to := []string{"raspberrych57@gmail.com"}
-
 		//Format message
 		var msgTo string
-		for i, s := range to {
+		for i, s := range config.MailTo {
 			if i != 0 {
 				msgTo = msgTo + ","
 			}
@@ -1086,16 +1067,14 @@ func sendMail(subj, body string) {
 			"Subject:" + subj + "\r\n" +
 			"\r\n" + body + "\r\n")
 
-		// Set up authentication information.
-		// auth := smtp.PlainAuth("", "raspberrych57@gmail.com", "Raspberrych4851", "smtp.gmail.com")
+		// Set up authentication information
 		auth := smtp.PlainAuth("", config.MailUser, config.MailPass, config.MailHost)
 
 		// Connect to the server, authenticate, set the sender and recipient,
 		// and send the email all in one step.
-		// err := smtp.SendMail("smtp.gmail.com:587", auth, "raspberrych57@gmail.com", to, msg)
 		err := smtp.SendMail(fmt.Sprintf("%v:%v", config.MailHost, config.MailPort), auth, config.MailFrom, config.MailTo, msg)
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Unable to send mail:", err)
 		}
 	}
 }
