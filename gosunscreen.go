@@ -870,7 +870,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		if req.PostFormValue("MailPass") != "" {
 			config.MailPass = req.PostFormValue("MailPass")
 		}
-		config.MailTo = stringToSlice(req.PostFormValue("IpWhitelist"))
+		config.MailTo = stringToSlice(req.PostFormValue("MailTo"))
 		config.MailHost = req.PostFormValue("MailHost")
 		mailPort, err := strToInt(req.PostFormValue("MailPort"))
 		if err != nil {
@@ -1075,7 +1075,9 @@ func sendMail(subj, body string) {
 		err := smtp.SendMail(fmt.Sprintf("%v:%v", config.MailHost, config.MailPort), auth, config.MailFrom, config.MailTo, msg)
 		if err != nil {
 			log.Println("Unable to send mail:", err)
+			return
 		}
+		log.Println("Send mail to", config.MailTo)
 	}
 }
 
