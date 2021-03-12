@@ -254,17 +254,21 @@ func (s *Sunscreen) Down() {
 func (site *Site) resetStartStop(d int) {
 	for _, s := range site.Sunscreens {
 		if s.AutoTime {
-			config.Location.Date = time.Now().AddDate(0, 0, d)
-			start, stop, err := config.Location.GetSunriseSunset()
-			if err != nil {
-				log.Fatal("Error during determining sunrise and sunset:", err)
-			}
-			s.Start, s.Stop = start.Add(s.SunStart), stop.Add(-s.SunStop)
+			s.resetAutoTime(d)
 		} else {
 			s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
 			s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
 		}
 	}
+}
+
+func (s *Sunscreen) resetAutoTime(d int) {
+	config.Location.Date = time.Now().AddDate(0, 0, d)
+	start, stop, err := config.Location.GetSunriseSunset()
+	if err != nil {
+		log.Fatal("Error during determining sunrise and sunset:", err)
+	}
+	s.Start, s.Stop = start.Add(s.SunStart), stop.Add(-s.SunStop)
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
@@ -675,8 +679,6 @@ func handlerEditSunscreen(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// TODO: add bool AutoTime and durations to form
-
 	// Check if there is anything after "/config/edit/", i.e. the sunscreen ID
 	id, err := strconv.Atoi(req.URL.Path[len("/config/edit/"):])
 	if err != nil {
@@ -838,7 +840,6 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 			site.LightSensor.Interval = interval
 		}
 		// Read, validate and store config
-		// TODO: include location Variables (and make start/stop read-only if it is set to true?
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err))
@@ -901,6 +902,24 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 			appendMsgs(fmt.Sprintf("Unable to save mail port: %v", err))
 		} else {
 			config.MailPort = mailPort
+		}
+		lat, err := strconv.ParseFloat(req.PostFormValue("Latitude"), 64)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save location latitude ('%v'): %v", lat, err))
+		} else {
+			config.Location.Latitude = lat
+		}
+		long, err := strconv.ParseFloat(req.PostFormValue("Longitude"), 64)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save location longitude ('%v'): %v", long, err))
+		} else {
+			config.Location.Longitude = long
+		}
+		utcOffset, err := strconv.ParseFloat(req.PostFormValue("UtcOffset"), 64)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save location UtcOffset ('%v'): %v", utcOffset, err))
+		} else {
+			config.Location.UtcOffset = utcOffset
 		}
 
 		var msg string
@@ -1222,17 +1241,35 @@ func (s *Sunscreen) processReq(req *http.Request) []string {
 		log.Println(msg)
 	}
 	s.Name = req.PostFormValue("Name")
-	start, err := seb.StoTime(req.PostFormValue("Start"), 0)
-	if err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
+	if req.PostFormValue("AutoTime") == "" {
+		s.AutoTime = false
+		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
+		} else {
+			s.Start = start
+		}
+		stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
+		} else {
+			s.Stop = stop
+		}
 	} else {
-		s.Start = start
-	}
-	stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
-	if err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
-	} else {
-		s.Stop = stop
+		s.AutoTime = true
+		sunStart, err := time.ParseDuration(req.PostFormValue("SunStart") + "m")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStart, err))
+		} else {
+			s.SunStart = sunStart
+		}
+		sunStop, err := time.ParseDuration(req.PostFormValue("SunStop") + "m")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStop, err))
+		} else {
+			s.SunStop = sunStop
+		}
+		s.resetAutoTime(0)
 	}
 	stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
 	if err != nil {

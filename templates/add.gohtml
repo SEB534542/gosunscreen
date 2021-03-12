@@ -17,6 +17,18 @@
 					<td><input type="text" name="Name" value="{{.Name}}" required></td>
 				</tr>
 				<tr>
+					<td><label for="AutoTime">Use Sunrise/Sunset?</label></td>
+					<td><input type="checkbox" name="AutoTime" value=true {{if eq .AutoTime true}} checked {{end}}></td>		
+				</tr>
+				<tr>
+					<td><label for="SunStart">Minutes after Sunrise</label></td>
+					<td><input type="number" name="SunStart" value="{{fminutes .SunStart}}" required></td>
+				</tr>
+				<tr>
+					<td><label for="SunStop">Minutes before SunStop</label></td>
+					<td><input type="number" name="SunStop" value="{{fminutes .SunStop}}" required></td>
+				</tr>
+				<tr>
 					<td><label for="Start">Start time (hh:mm)</label></td>
 					<td><input type="time" name="Start" value="{{fdateHM .Start}}" required></td>
 				</tr>
