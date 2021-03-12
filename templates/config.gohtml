@@ -134,7 +134,22 @@
 			<td></td>
 			<td><label for="Password">Password</label></td>
 			<td><input type="password" name="Password"></td>
-		</tr>		
+		</tr>	
+		<tr>
+			<td><b>Location</b></td>
+			<td><label for="Latitude">Latitude</label></td>
+			<td><input type="number" name="Latitude" value="{{.Config.Location.Latitude}}"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="Longitude">Longitude</label></td>
+			<td><input type="number" name="Longitude" value="{{.Config.Location.Longitude}}"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="UtcOffset">UtcOffset</label></td>
+			<td><input type="number" name="UtcOffset" value="{{.Config.Location.UtcOffset}}"></td>
+		</tr>			
 	</table>
 	<br>
 	<input type="submit" value="Save"><br>
