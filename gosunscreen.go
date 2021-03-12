@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/SEB534542/seb"
+	"github.com/kelvins/sunrisesunset"
 	"github.com/satori/go.uuid"
 	"github.com/stianeikeland/go-rpio/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -47,6 +48,9 @@ type Sunscreen struct {
 	DurUp         time.Duration // Duration to move Sunscreen up
 	PinDown       rpio.Pin      // GPIO pin for moving sunscreen down
 	PinUp         rpio.Pin      // GPIO pin for moving sunscreen up
+	AutoTime      bool          // If true, Start and Stop are calculated based on config.Location
+	SunStart      time.Duration // Duration after Sunsrise to determine Start
+	SunStop       time.Duration // Duration after before Sunset to determine Stop
 	Start         time.Time     // Time after which Sunscreen can shine on the Sunscreen area
 	Stop          time.Time     // Time after which Sunscreen no can shine on the Sunscreen area
 	StopThreshold time.Duration // Duration before Stop that Sunscreen no longer should go down
@@ -58,20 +62,23 @@ type Site struct {
 }
 
 type Config struct {
-	RefreshRate time.Duration // Number of seconds the main page should refresh
-	MoveHistory int           // Number of sunscreen movements to be shown
-	LogRecords  int           // Number of log records that are shown
-	Username    string        // Username for logging in
-	Password    []byte        // Password for logging in
-	IpWhitelist []string      // Whitelisted IPs
-	Port        int           // Port of the localhost
-	EnableMail  bool          // Enable mail functionality
-	MailFrom    string        // E-mail address from, often same as username
-	MailUser    string        // E-mail Username
-	MailPass    string        // E-mail Password
-	MailTo      []string      // E-mail to
-	MailHost    string        // E-mail host
-	MailPort    int           // E-mail host port
+	RefreshRate time.Duration            // Number of seconds the main page should refresh
+	MoveHistory int                      // Number of sunscreen movements to be shown
+	LogRecords  int                      // Number of log records that are shown
+	Username    string                   // Username for logging in
+	Password    []byte                   // Password for logging in
+	IpWhitelist []string                 // Whitelisted IPs
+	Port        int                      // Port of the localhost
+	EnableMail  bool                     // Enable mail functionality
+	MailFrom    string                   // E-mail address from, often same as username
+	MailUser    string                   // E-mail Username
+	MailPass    string                   // E-mail Password
+	MailTo      []string                 // E-mail to
+	MailHost    string                   // E-mail host
+	MailPort    int                      // E-mail host port
+	Location    sunrisesunset.Parameters // Contains Latiude, longitude, UtcOffset and Date
+	Sunrise     time.Time                // Date and time of sunrise for Location
+	Sunset      time.Time                // Date and time of sunset for Location
 }
 
 // General constants
@@ -158,11 +165,7 @@ func main() {
 	err = seb.LoadConfig(siteFile, &site)
 
 	//Resetting Start and Stop to today
-	for _, s := range site.Sunscreens {
-		s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location())
-		s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location())
-		log.Printf("%v Start: %v, Stop: %v\n", s.Id, s.Start.Format("2 Jan 15:04 MST"), s.Stop.Format("2 Jan 15:04 MST"))
-	}
+	site.resetStartStop(0)
 
 	// Connecting to rpio Pins
 	rpio.Open()
@@ -245,6 +248,22 @@ func (s *Sunscreen) Up() {
 func (s *Sunscreen) Down() {
 	if s.Position != down {
 		s.Move()
+	}
+}
+
+func (site *Site) resetStartStop(d int) {
+	for _, s := range site.Sunscreens {
+		if s.AutoTime {
+			config.Location.Date = time.Now().AddDate(0, 0, d)
+			start, stop, err := config.Location.GetSunriseSunset()
+			if err != nil {
+				log.Fatal("Error during determining sunrise and sunset:", err)
+			}
+			s.Start, s.Stop = start.Add(s.SunStart), stop.Add(-s.SunStop)
+		} else {
+			s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
+			s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
+		}
 	}
 }
 
@@ -444,10 +463,7 @@ func (site *Site) monitorLight() {
 			}
 		} else if time.Now().After(maxStop) {
 			log.Printf("Sun is down (%v), adjusting Sunrise/set", maxStop.Format("2 Jan 15:04 MST"))
-			for _, s := range site.Sunscreens {
-				s.Start = s.Start.AddDate(0, 0, 1)
-				s.Stop = s.Stop.AddDate(0, 0, 1)
-			}
+			site.resetStartStop(1)
 		} else {
 			// Sun is not up yet, ensure Data is empty
 			site.LightSensor.Data = []int{}
@@ -654,6 +670,13 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 }
 
 func handlerEditSunscreen(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// TODO: add bool AutoTime and durations to form
+
 	// Check if there is anything after "/config/edit/", i.e. the sunscreen ID
 	id, err := strconv.Atoi(req.URL.Path[len("/config/edit/"):])
 	if err != nil {
@@ -815,6 +838,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 			site.LightSensor.Interval = interval
 		}
 		// Read, validate and store config
+		// TODO: include location Variables (and make start/stop read-only if it is set to true?
 		refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save RefreshRate '%v' (%v)", refreshRate, err))
