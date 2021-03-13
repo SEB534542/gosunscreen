@@ -15,18 +15,18 @@
 				<tr>
 					<td><label for="Name">Sunscreen Name</label></td>
 					<td><input type="text" name="Name" value="{{.Name}}" required></td>
-				</tr>
-				<tr>
-					<td><label for="AutoTime">Use Sunrise/Sunset</label></td>
-					<td><input type="checkbox" name="AutoTime" value=true {{if eq .AutoTime true}} checked {{end}}></td>		
-				</tr>
+				</tr>			
 				<tr>
 					<td><label for="SunStart">Minutes after Sunrise</label></td>
 					<td><input type="number" name="SunStart" value="{{fminutes .SunStart}}" required></td>
+					<td><input type="checkbox" name="AutoStart" value=true {{if eq .AutoStart true}} checked {{end}}></td>		
+					<td><label for="AutoStart"><i>Check this box if you want to have start time based on Sunrise</i></label></td>
 				</tr>
 				<tr>
 					<td><label for="SunStop">Minutes before Sunset</label></td>
 					<td><input type="number" name="SunStop" value="{{fminutes .SunStop}}" required></td>
+					<td><input type="checkbox" name="AutoStop" value=true {{if eq .AutoStop true}} checked {{end}}></td>
+					<td><label for="AutoStop"><i>Check this box if you want to have start time based on Sunset</i></label></td>
 				</tr>
 				<tr>
 					<td><label for="Start">Start time (hh:mm)</label></td>

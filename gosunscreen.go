@@ -48,8 +48,9 @@ type Sunscreen struct {
 	DurUp         time.Duration // Duration to move Sunscreen up
 	PinDown       rpio.Pin      // GPIO pin for moving sunscreen down
 	PinUp         rpio.Pin      // GPIO pin for moving sunscreen up
-	AutoTime      bool          // If true, Start and Stop are calculated based on config.Location
-	SunStart      time.Duration // Duration after Sunsrise to determine Start
+	AutoStart     bool          // If true, Start is calculated based on config.Location.GetSunriseSunset() and SunStart
+	AutoStop      bool          // If true, Stop is calculated based on config.Location.GetSunriseSunset() and SunStop
+	SunStart      time.Duration // Duration after Sunrise to determine Start
 	SunStop       time.Duration // Duration after before Sunset to determine Stop
 	Start         time.Time     // Time after which Sunscreen can shine on the Sunscreen area
 	Stop          time.Time     // Time after which Sunscreen no can shine on the Sunscreen area
@@ -253,22 +254,34 @@ func (s *Sunscreen) Down() {
 
 func (site *Site) resetStartStop(d int) {
 	for _, s := range site.Sunscreens {
-		if s.AutoTime {
+		if s.AutoStart || s.AutoStop {
 			s.resetAutoTime(d)
-		} else {
+		}
+		if !s.AutoStart {
 			s.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Start.Hour(), s.Start.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
+		}
+		if !s.AutoStop {
 			s.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), s.Stop.Hour(), s.Stop.Minute(), 0, 0, time.Now().Location()).AddDate(0, 0, d)
 		}
 	}
 }
 
 func (s *Sunscreen) resetAutoTime(d int) {
-	config.Location.Date = time.Now().AddDate(0, 0, d)
-	start, stop, err := config.Location.GetSunriseSunset()
-	if err != nil {
-		log.Fatal("Error during determining sunrise and sunset:", err)
+	var start, stop time.Time
+	var err error
+	if s.AutoStart || s.AutoStop {
+		config.Location.Date = time.Now().AddDate(0, 0, d)
+		start, stop, err = config.Location.GetSunriseSunset()
+		if err != nil {
+			log.Fatal("Error during determining sunrise and sunset:", err)
+		}
 	}
-	s.Start, s.Stop = start.Add(s.SunStart), stop.Add(-s.SunStop)
+	if s.AutoStart {
+		s.Start = start.Add(s.SunStart)
+	}
+	if s.AutoStop {
+		s.Stop = stop.Add(-s.SunStop)
+	}
 }
 
 // ReviewPosition reviews the position of the Sunscreen against the lightData and moves the Sunscreen up or down if it meets the criteria
@@ -1241,14 +1254,26 @@ func (s *Sunscreen) processReq(req *http.Request) []string {
 		log.Println(msg)
 	}
 	s.Name = req.PostFormValue("Name")
-	if req.PostFormValue("AutoTime") == "" {
-		s.AutoTime = false
+
+	if req.PostFormValue("AutoStart") == "" {
+		s.AutoStart = false
 		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
 		} else {
 			s.Start = start
 		}
+	} else {
+		s.AutoStart = true
+		sunStart, err := time.ParseDuration(req.PostFormValue("SunStart") + "m")
+		if err != nil {
+			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStart, err))
+		} else {
+			s.SunStart = sunStart
+		}
+	}
+	if req.PostFormValue("AutoStop") == "" {
+		s.AutoStop = false
 		stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
@@ -1256,21 +1281,15 @@ func (s *Sunscreen) processReq(req *http.Request) []string {
 			s.Stop = stop
 		}
 	} else {
-		s.AutoTime = true
-		sunStart, err := time.ParseDuration(req.PostFormValue("SunStart") + "m")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStart, err))
-		} else {
-			s.SunStart = sunStart
-		}
+		s.AutoStop = true
 		sunStop, err := time.ParseDuration(req.PostFormValue("SunStop") + "m")
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStop, err))
 		} else {
 			s.SunStop = sunStop
 		}
-		s.resetAutoTime(0)
 	}
+	s.resetAutoTime(0)
 	stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
 	if err != nil {
 		appendMsgs(fmt.Sprintf("Unable to save StopThreshold '%v' (%v)", stopThreshold, err))
