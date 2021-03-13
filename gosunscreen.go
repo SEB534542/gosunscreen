@@ -236,6 +236,7 @@ func (s *Sunscreen) Move() {
 	mode := s.Mode
 	sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s. Light: %v", old, new, site.LightSensor.Data))
 	appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(site.LightSensor.Data)}})
+	SaveToJson(site, siteFile)
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
