@@ -203,9 +203,9 @@ func main() {
 	http.HandleFunc("/login", handlerLogin)
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
-	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), "cert.pem", "key.pem", nil)
+	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), "/etc/letsencrypt/live/sunscreen11.duckdns.org/cert.pem", "/etc/letsencrypt/live/sunscreen11.duckdns.org/privkey.pem", nil)
 	if err != nil {
-		log.Println("ERROR: Unable to launch TLS, launching without TLS...")
+		log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
 		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
 	}
 }
