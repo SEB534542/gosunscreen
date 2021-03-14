@@ -80,6 +80,8 @@ type Config struct {
 	Location    sunrisesunset.Parameters // Contains Latiude, longitude, UtcOffset and Date
 	Sunrise     time.Time                // Date and time of sunrise for Location
 	Sunset      time.Time                // Date and time of sunset for Location
+	Cert        string                   // location and name of cert.pem for HTTPS connection
+	Key         string                   // location and name of cert.pem for HTTPS connection
 }
 
 // General constants
@@ -203,7 +205,7 @@ func main() {
 	http.HandleFunc("/login", handlerLogin)
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
-	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), "/etc/letsencrypt/live/sunscreen11.duckdns.org/cert.pem", "/etc/letsencrypt/live/sunscreen11.duckdns.org/privkey.pem", nil)
+	err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
 		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
@@ -879,6 +881,8 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		} else {
 			config.Port = port
 		}
+		config.Cert = req.PostFormValue("Cert")
+		config.Key = req.PostFormValue("Key")
 		if req.PostFormValue("Username") != "" && req.PostFormValue("Username") != config.Username {
 			err = bcrypt.CompareHashAndPassword(config.Password, []byte(req.PostFormValue("CurrentPassword")))
 			if err != nil {

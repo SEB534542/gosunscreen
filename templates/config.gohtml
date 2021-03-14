@@ -84,7 +84,16 @@
 			<td><label for="Port">Port (range: 1000-9999; requires reboot)</label></td>
 			<td><input type="text" name="Port" value="{{.Config.Port}}"></td>
 		</tr>
-		
+		<tr>
+			<td></td>
+			<td><label for="Cert">Cert location</label></td>
+			<td><input type="text" name="Cert" value="{{.Config.Cert}}"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td><label for="Key">Key location</label></td>
+			<td><input type="text" name="Key" value="{{.Config.Key}}"></td>
+		</tr>
 		<tr>
 			<td><b>E-mail</b></td>
 			<td><label for="EnableMail">EnableMail</label></td>
