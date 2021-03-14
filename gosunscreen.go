@@ -668,18 +668,25 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	mu.Lock()
 	switch mode {
 	case auto:
-		if site.Sunscreens[i].Mode == manual {
+		if site.Sunscreens[i].Mode != auto {
 			go site.Sunscreens[i].autoSunscreen(site.LightSensor)
 			site.Sunscreens[i].Mode = auto
+			SaveToJson(site, siteFile)
 			log.Printf("Set mode to auto (%v)\n", site.Sunscreens[i].Mode)
 		} else {
 			log.Printf("Mode is already auto (%v)\n", site.Sunscreens[i].Mode)
 		}
 	case manual + "/" + up:
-		site.Sunscreens[i].Mode = manual
+		if site.Sunscreens[i].Mode != manual {
+			site.Sunscreens[i].Mode = manual
+			SaveToJson(site, siteFile)
+		}
 		site.Sunscreens[i].Up()
 	case manual + "/" + down:
-		site.Sunscreens[i].Mode = manual
+		if site.Sunscreens[i].Mode != manual {
+			site.Sunscreens[i].Mode = manual
+			SaveToJson(site, siteFile)
+		}
 		site.Sunscreens[i].Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
