@@ -79,12 +79,14 @@ func calcAverage(xi ...int) int {
 // func main() {
 // 	factor := 50
 // 	for {
-// 		value, err := getAvgLight(rpio.Pin(5))
-// 		if err != nil {
-// 			log.Println(err)
-// 		} else {
-// 			log.Println("Light gathered:", value/factor)
+// 		if h := time.Now().Hour(); h > 8 && h < 22 {
+// 			value, err := getAvgLight(rpio.Pin(5))
+// 			if err != nil {
+// 				log.Println(err)
+// 			} else {
+// 				log.Println("Light gathered:", value/factor)
+// 			}
+// 			time.Sleep(60 * time.Second)
 // 		}
-// 		time.Sleep(60 * time.Second)
 // 	}
 // }
