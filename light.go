@@ -33,7 +33,7 @@ func getLight(pin rpio.Pin) (int, error) {
 	return count, nil
 }
 
-// TODO: ensure that output from GetCurrentLight() is divided by ls.LightFactor
+// TODO: ensure that output from GetCurrentLight() is divided by LightFactor in main code section.
 
 /* GetCurrentLight takes a pin and frequency, collects the input from the light
 sensor on that rpio pin and returns the average value as a slice of int together
@@ -45,6 +45,7 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	for i < len(values) {
 		value, err := getLight(pin)
 		if err != nil {
+			fmt.Println(err) // TODO: remove line
 			errs = fmt.Sprintf("%v\n\t%v", errs, err)
 			// Value should not be stored as there is an error, so shorten slice
 			values = append(values[:i], values[i+1:]...)
@@ -62,6 +63,8 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	case x == 0:
 		// Average is zero
 		err = fmt.Errorf("Average light from pin %v is zero after %v attempts. Errors:%v", pin, freq, errs)
+	case len(values) != freq:
+		err = fmt.Errorf("%v/%v attempts failed from pin %v, but was able to gather light. Errors:%v", freq-len(values), freq, pin, err)
 	}
 	return x, err
 }
