@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
 )
+
+const maxCount = 9999999
 
 /* GetLight Takes a pin, measures the current light from the sensor on that rpio pin and
 returns the value and error message.*/
@@ -12,7 +15,7 @@ func getLight(pin rpio.Pin) (int, error) {
 	count := 0
 	// Output on the pin for 0.1 seconds
 	pin.Output()
-	pin.PinLight.Low()
+	pin.Low()
 	time.Sleep(100 * time.Millisecond)
 
 	// Change the pin back to input
@@ -52,7 +55,7 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	x := calcAverage(values...)
 
 	// Error handling
-	err = nil
+	var err error
 	switch {
 	case len(values) == 0:
 		err = fmt.Errorf("All of the %v attempts failed from pin %v. Errors:%v", freq, pin, errs)
@@ -75,18 +78,3 @@ func calcAverage(xi ...int) int {
 	}
 	return total / len(xi)
 }
-
-// func main() {
-// 	factor := 50
-// 	for {
-// 		if h := time.Now().Hour(); h > 8 && h < 22 {
-// 			value, err := getAvgLight(rpio.Pin(5))
-// 			if err != nil {
-// 				log.Println(err)
-// 			} else {
-// 				log.Println("Light gathered:", value/factor)
-// 			}
-// 			time.Sleep(60 * time.Second)
-// 		}
-// 	}
-// }
