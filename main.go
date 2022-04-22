@@ -16,6 +16,7 @@ type LightSensor struct {
 	Start       time.Time     // Start time for measuring light
 	Stop        time.Time     // Stop time for measuring light
 	Data        []int         // collected light values
+	// TODO: specify length of data
 }
 
 func main() {
@@ -33,23 +34,37 @@ func main() {
 func (ls *LightSensor) Monitor() {
 	for {
 		switch {
-		case true:
+		case t.After(ls.Stop):
+			// Reset Start and Stop to tomorrow
+			ls.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Start.Hour(), ls.Start.Minute(), 0, 0, time.Local)
+			ls.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Stop.Hour(), ls.Stop.Minute(), 0, 0, time.Local)
+			fallthrough
+		case t.Before(ls.Start):
+			// Sleep until Start
+			time.Sleep(time.Until(ls.Start))
+		default:
+			// Monitor light
 			light := make(chan int, 2)
-			quit := makemonitor(chan bool)
+			quit := make(chan bool)
 			go sendLight(ls.Pin, ls.Interval, ls.LightFactor, light, quit)
-			go receiveLight(light)
+			for time.Now().After(ls.Start) && time.Now().Before(ls.Stop) {
+				l := <-light
+				log.Printf("Storing light %v...", l)
+				ls.Data = shiftSlice(ls.Data, l)
+				// TODO: store light into a log file (via go func?)
+			}
+			close(quit)
 		}
 	}
 }
 
-/*sendLight gathers light from pin every interval and send the light value
+/*SendLight gathers light from pin every interval and send the light value
 on to a channel. This loop runs until the quit chan is closed.*/
 func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan<- int, quit <-chan bool) {
 	for {
 		select {
 		case _, _ = <-quit:
 			log.Println("Closing monitorLight") // TODO: remove from log?
-			close(light)
 			return
 		default:
 			l, err := getAvgLight(pin, freq)
@@ -67,11 +82,10 @@ func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan
 	}
 }
 
-/*ReceiveLight receives the light and store is in the variable.*/
-func receiveLight(light <-chan int) {
-	for l := range light {
-		log.Printf("Storing light %v...", l)
-		// TODO: store light into struct
-		// TODO: store light into a log file (via go func?)
+func shiftSlice(xi []int, x int) []int {
+	for i := len(xi) - 1; i > 0; i-- {
+		xi[i] = xi[i-1]
 	}
+	xi[0] = x
+	return xi
 }
