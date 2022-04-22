@@ -2,12 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
 )
 
-const maxCount = 9999999
+const (
+	maxCount = 9999999 // Maximum allowed count value while measuring light
+	freq     = 10      // Number of times light is measured to get an average value
+)
 
 /* GetLight Takes a pin, measures the current light from the sensor on that rpio pin and
 returns the value and error message.*/
@@ -28,7 +32,7 @@ func getLight(pin rpio.Pin) (int, error) {
 		}
 	}
 	if count == 0 {
-		return count, fmt.Errorf("Count is zero (%v)", count)
+		return count, fmt.Errorf("Count is zero")
 	}
 	return count, nil
 }
@@ -37,20 +41,19 @@ func getLight(pin rpio.Pin) (int, error) {
 
 /* GetCurrentLight takes a pin and frequency, collects the input from the light
 sensor on that rpio pin and returns the average value as a slice of int together
-with any errors. */
+with any errors. If int returned is zero, it means no light was measured
+(which is accompanied with an error). However, it can be the case that some of
+the attempts failed (ie errors generated), but a light value was measured.*/
 func getAvgLight(pin rpio.Pin, freq int) (int, error) {
-	values := make([]int, freq, freq)
+	values := []int{}
 	var errs string
 	i := 0
-	for i < len(values) {
+	for i < freq {
 		value, err := getLight(pin)
 		if err != nil {
-			fmt.Println(err) // TODO: remove line
 			errs = fmt.Sprintf("%v\n\t%v", errs, err)
-			// Value should not be stored as there is an error, so shorten slice
-			values = append(values[:i], values[i+1:]...)
 		}
-		values[i] = value
+		values = append(values, value)
 		i++
 	}
 	x := calcAverage(values...)
@@ -59,12 +62,9 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	var err error
 	switch {
 	case len(values) == 0:
-		err = fmt.Errorf("All of the %v attempts failed from pin %v. Errors:%v", freq, pin, errs)
-	case x == 0:
-		// Average is zero
-		err = fmt.Errorf("Average light from pin %v is zero after %v attempts. Errors:%v", pin, freq, errs)
+		err = fmt.Errorf("All %v attempts failed. Errors:%v", freq, errs)
 	case len(values) != freq:
-		err = fmt.Errorf("%v/%v attempts failed from pin %v, but was able to gather light. Errors:%v", freq-len(values), freq, pin, err)
+		err = fmt.Errorf("%v/%v attempts failed. %v Errors:%v", freq-len(values), freq, values, err) // TODO: remove values
 	}
 	return x, err
 }
@@ -80,4 +80,31 @@ func calcAverage(xi ...int) int {
 		total = total + v
 	}
 	return total / len(xi)
+}
+
+/*sendLight gathers light from pin every interval and send the light value
+on to a channel. This loop runs until the quit chan is closed.*/
+func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan<- int, quit <-chan bool) {
+	for {
+		select {
+		case _, _ = <-quit:
+			log.Println("Closing monitorLight") // TODO: remove from log?
+			close(light)
+			return
+		default:
+			l, err := getAvgLight(pin, freq)
+			l = l / lightFactor
+			// Errorhandling
+			switch {
+			case l == 0:
+				log.Printf("No light gathered. Errors: %v", err)
+			case err != nil:
+				log.Printf("Light gathered: %v with errors: %v", l, err)
+
+			}
+			light <- l
+			// TODO: store light into a log file (via go func?)
+			time.Sleep(interval)
+		}
+	}
 }

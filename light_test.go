@@ -21,6 +21,6 @@ const (
 func TestGetAvgLight(t *testing.T) {
 	rpio.Open()
 	defer rpio.Close()
-	light, err := getAvgLight(lightSensor, freq)
+	light, err := getAvgLight(LightPin, freq)
 	t.Log(light, err)
 }
