@@ -81,30 +81,3 @@ func calcAverage(xi ...int) int {
 	}
 	return total / len(xi)
 }
-
-/*sendLight gathers light from pin every interval and send the light value
-on to a channel. This loop runs until the quit chan is closed.*/
-func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan<- int, quit <-chan bool) {
-	for {
-		select {
-		case _, _ = <-quit:
-			log.Println("Closing monitorLight") // TODO: remove from log?
-			close(light)
-			return
-		default:
-			l, err := getAvgLight(pin, freq)
-			l = l / lightFactor
-			// Errorhandling
-			switch {
-			case l == 0:
-				log.Printf("No light gathered. Errors: %v", err)
-			case err != nil:
-				log.Printf("Light gathered: %v with errors: %v", l, err)
-
-			}
-			light <- l
-			// TODO: store light into a log file (via go func?)
-			time.Sleep(interval)
-		}
-	}
-}
