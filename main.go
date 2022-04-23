@@ -23,26 +23,32 @@ func main() {
 	rpio.Open()
 	defer rpio.Close()
 	ls := &LightSensor{
-		Pin:      rpio.Pin(23),
-		Interval: time.Duration(time.Minute),
-		Start:    time.Date(2022, 1, 1, 8, 0, 0, 0, time.Local),
-		Stop:     time.Date(2022, 1, 1, 20, 0, 0, 0, time.Local),
+		Pin:         rpio.Pin(23),
+		Interval:    time.Duration(time.Minute),
+		LightFactor: 12,
+		Start:       time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Local),
+		Stop:        time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 22, 0, 0, 0, time.Local),
+		Data:        []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
+	log.Println("Starting monitor") // TODO: remove(?)
 	ls.Monitor()
 }
 
 func (ls *LightSensor) Monitor() {
 	for {
 		switch {
-		case t.After(ls.Stop):
+		case time.Now().After(ls.Stop):
+			log.Println("Reset Start and Stop to tomorrow") // TODO: remove(?)
 			// Reset Start and Stop to tomorrow
 			ls.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Start.Hour(), ls.Start.Minute(), 0, 0, time.Local)
 			ls.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Stop.Hour(), ls.Stop.Minute(), 0, 0, time.Local)
 			fallthrough
-		case t.Before(ls.Start):
+		case time.Now().Before(ls.Start):
+			log.Println("Sleep until Start", time.Until(ls.Start)) // TODO: remove(?)
 			// Sleep until Start
 			time.Sleep(time.Until(ls.Start))
 		default:
+			log.Println("Monitoring light...") // TODO: remove(?)
 			// Monitor light
 			light := make(chan int, 2)
 			quit := make(chan bool)
