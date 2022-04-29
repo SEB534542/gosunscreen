@@ -17,7 +17,6 @@ type LightSensor struct {
 	Start       time.Time     // Start time for measuring light
 	Stop        time.Time     // Stop time for measuring light
 	Data        []int         // collected light values
-	// TODO: specify length of data
 }
 
 const (
