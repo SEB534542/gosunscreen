@@ -1,26 +1,41 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
+	"html/template"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/kelvins/sunrisesunset"
+	"github.com/satori/go.uuid"
+	"github.com/stianeikeland/go-rpio/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Config struct {
-	RefreshRate time.Duration // Number of seconds the main page should refresh
-	MoveHistory int           // Number of sunscreen movements to be shown
-	LogRecords  int           // Number of log records that are shown
-	Username    string        // Username for logging in
-	Password    []byte        // Password for logging in
-	IpWhitelist []string      // Whitelisted IPs
-	Port        int           // Port of the localhost
-	EnableMail  bool          // Enable mail functionality
-	MailFrom    string        // E-mail address from, often same as username
-	MailUser    string        // E-mail Username
-	MailPass    string        // E-mail Password
-	MailTo      []string      // E-mail to
-	MailHost    string        // E-mail host
-	MailPort    int           // E-mail host port
-	Cert        string        // location and name of cert.pem for HTTPS connection
-	Key         string        // location and name of cert.pem for HTTPS connection
+	RefreshRate time.Duration            // Number of seconds the main page should refresh
+	MoveHistory int                      // Number of sunscreen movements to be shown
+	LogRecords  int                      // Number of log records that are shown
+	Username    string                   // Username for logging in
+	Password    []byte                   // Password for logging in
+	IpWhitelist []string                 // Whitelisted IPs
+	Port        int                      // Port of the localhost
+	EnableMail  bool                     // Enable mail functionality
+	MailFrom    string                   // E-mail address from, often same as username
+	MailUser    string                   // E-mail Username
+	MailPass    string                   // E-mail Password
+	MailTo      []string                 // E-mail to
+	MailHost    string                   // E-mail host
+	MailPort    int                      // E-mail host port
+	Cert        string                   // location and name of cert.pem for HTTPS connection
+	Key         string                   // location and name of cert.pem for HTTPS connection
+	Location    sunrisesunset.Parameters // Contains Latiude, longitude, UtcOffset and Date for calculation when sun rises and sets
 }
 
 var (
@@ -43,14 +58,13 @@ func startServer() {
 	http.HandleFunc("/", handlerMain)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", handlerMode)
-	http.HandleFunc("/config/edit/", handlerEditSunscreen)
 	http.HandleFunc("/config/", handlerConfig)
 	http.HandleFunc("/log/", handlerLog)
 	http.HandleFunc("/login", handlerLogin)
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
 	// TODO: change to https
-	log.Fatal(http.ListenAndServe(":"+config.Port, nil))
+	log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
 	// err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
 	// if err != nil {
 	// 	log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
@@ -64,7 +78,7 @@ func handlerLog(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	f, err := ioutil.ReadFile(logFile)
+	f, err := ioutil.ReadFile(fileLog)
 	if err != nil {
 		fmt.Println("File reading error", err)
 		return
@@ -78,7 +92,7 @@ func handlerLog(w http.ResponseWriter, req *http.Request) {
 		FileName  string
 		LogOutput []string
 	}{
-		logFile,
+		fileLog,
 		reverseXS(lines)[:max],
 	}
 	err = tpl.ExecuteTemplate(w, "log.gohtml", data)
@@ -100,7 +114,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		// Store lightsensor config
 		msgsNew := updateLightsensor(req)
 		if len(msgsNew) == 0 {
-			SaveToJson(s, fileLightsensor)
+			SaveToJSON(s, fileLightsensor)
 			log.Println("Saved lightsensor")
 		} else {
 			msg := "Unable to save lightsensor, please correct errors"
@@ -112,7 +126,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		// Store sunscreen config
 		msgsNew = updateSunscreen(req)
 		if len(msgsNew) == 0 {
-			SaveToJson(s, fileSunscrn)
+			SaveToJSON(s, fileSunscrn)
 			log.Println("Saved sunscreen")
 		} else {
 			msg := "Unable to save Sunscreen, please correct errors"
@@ -124,7 +138,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		//Store general config
 		msgsNew = updateConfig(req)
 		if len(msgsNew) == 0 {
-			SaveToJson(config, fileConfig)
+			SaveToJSON(config, fileConfig)
 			log.Println("Saved general config")
 		} else {
 			msg := "Unable to save general config, please correct errors"
@@ -160,7 +174,7 @@ func handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ip := GetIP(req)
+	ip := getIP(req)
 
 	// Check if IP is on whitelist (true)
 	knownIp := func(ip string) bool {
@@ -285,7 +299,7 @@ func handlerLight(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	//mu.Lock()
-	stats := readCSV(lightFile)
+	stats := readCSV(fileLight)
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-config.LogRecords):]
 	}
@@ -310,16 +324,12 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	// Url options: '/mode/auto" or '/mode/manual/up' or '/mode/manual/down'
 	idMode := req.URL.Path[len("/mode/"):]
 	mode := idMode[strings.Index(idMode, "/")+1:]
-	if err != nil {
-		http.Error(w, "Unknown Sunscreen Id", http.StatusForbidden)
-		return
-	}
 	//mu.Lock()
 	switch mode {
 	case auto:
 		if s.Mode != auto {
 			s.Mode = auto
-			SaveToJson(s, fileSunscrn)
+			SaveToJSON(s, fileSunscrn)
 			log.Printf("Set mode to auto (%v)\n", s.Mode)
 		} else {
 			log.Printf("Mode is already auto (%v)\n", s.Mode)
@@ -327,13 +337,13 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	case manual + "/" + up:
 		if s.Mode != manual {
 			s.Mode = manual
-			SaveToJson(s, fileSunscrn)
+			SaveToJSON(s, fileSunscrn)
 		}
 		s.Up()
 	case manual + "/" + down:
 		if s.Mode != manual {
 			s.Mode = manual
-			SaveToJson(s, fileSunscrn)
+			SaveToJSON(s, fileSunscrn)
 		}
 		s.Down()
 	default:
@@ -358,16 +368,6 @@ func seconds(d time.Duration) string {
 
 func sliceToString(xs []string) string {
 	return strings.Join(xs, ",")
-}
-
-// GetIP gets a requests IP address by reading off the forwarded-for
-// header (for proxies) and falls back to use the remote address.
-func GetIP(req *http.Request) string {
-	forwarded := req.Header.Get("X-FORWARDED-FOR")
-	if forwarded != "" {
-		return forwarded
-	}
-	return req.RemoteAddr
 }
 
 func reverseXSS(xxs [][]string) [][]string {
@@ -428,7 +428,7 @@ func updateSunscreen(req *http.Request) []string {
 	}
 	if req.PostFormValue("AutoStart") == "" {
 		s.AutoStart = false
-		start, err := seb.StoTime(req.PostFormValue("Start"), 0)
+		start, err := stoTime(req.PostFormValue("Start"), 0)
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
 		} else {
@@ -445,7 +445,7 @@ func updateSunscreen(req *http.Request) []string {
 	}
 	if req.PostFormValue("AutoStop") == "" {
 		s.AutoStop = false
-		stop, err := seb.StoTime(req.PostFormValue("Stop"), 0)
+		stop, err := stoTime(req.PostFormValue("Stop"), 0)
 		if err != nil {
 			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
 		} else {
@@ -559,7 +559,7 @@ func updateLightsensor(req *http.Request) []string {
 			ls.TimesBad = timesBad
 		}
 	}
-	outliers, err = strToInt(req.PostFormValue("Outliers"))
+	outliers, err := strToInt(req.PostFormValue("Outliers"))
 	if err != nil {
 		appendMsgs(fmt.Sprintf("Error reading Outliers ('%v'): %v", outliers, err))
 	} else {
@@ -575,10 +575,10 @@ func updateLightsensor(req *http.Request) []string {
 	if !(pin > 0 && pin < 28) || err != nil {
 		appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pin, err))
 	} else {
-		ls.PinLight = rpio.Pin(pin)
+		ls.Pin = rpio.Pin(pin)
 	}
 	interval, err := time.ParseDuration(req.PostFormValue("Interval") + "s")
-	if err != nil || interval.Seconds() < IntervalMin {
+	if err != nil || interval < IntervalMin {
 		appendMsgs(fmt.Sprintf("Unable to save Interval '%v', should be minimal %v seconds (%v)", interval, IntervalMin, err))
 	} else {
 		ls.Interval = interval
@@ -730,10 +730,29 @@ func strToInt(s string) (int, error) {
 
 // GetIP gets a requests IP address by reading off the forwarded-for
 // header (for proxies) and falls back to use the remote address.
-func GetIP(req *http.Request) string {
+func getIP(req *http.Request) string {
 	forwarded := req.Header.Get("X-FORWARDED-FOR")
 	if forwarded != "" {
 		return forwarded
 	}
 	return req.RemoteAddr
+}
+
+// MaxIntSlice receives variadic parameter of integers and return the highest integer
+func MaxIntSlice(xi ...int) int {
+	var max int
+	for i, v := range xi {
+		if i == 0 || v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func stringToSlice(s string) []string {
+	xs := strings.Split(s, ",")
+	for i, v := range xs {
+		xs[i] = strings.Trim(v, " ")
+	}
+	return xs
 }

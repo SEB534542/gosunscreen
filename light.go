@@ -126,7 +126,7 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 				ls.Data = shiftSlice(ls.Data, l)
 				if s != nil {
 					if s.Mode == auto {
-						s.evaluate(ls.data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
+						s.evaluate(ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
 						// TODO: store light into a log file (via go func?)
 					}
 				}

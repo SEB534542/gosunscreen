@@ -1,11 +1,16 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/smtp"
 	"os"
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Constants for config folder and files
@@ -98,11 +103,11 @@ func main() {
 }
 
 // UpdateStartStop resets all start/stop to today + d (e.g. d=0 resets it to today.
-func updateStartStop(s *Sunscreen, ls *lightSensor, d int) {
+func updateStartStop(s *Sunscreen, ls *LightSensor, d int) {
 	s.resetStartStop(d)
 	// Light sensor should start in time so at sunscreen start enough light has been gathered
-	d := time.Duration((max(timesGood, timesNeutral, timesBad)+Outliers)/interval.Minutes()) * time.Minute()
-	ls.Start = s.Start.Sub(d)
+	dur := time.Duration((max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad)+ls.Outliers)/int(ls.Interval.Minutes())) * time.Minute
+	ls.Start = s.Start.Add(-dur)
 	ls.Stop = s.Stop.Add(time.Duration(30 * time.Minute))
 }
 
@@ -142,7 +147,7 @@ func loadConfig() {
 	// Load config
 	err := readJSON(fileConfig, &config)
 	if err != nil {
-		log.Printf("Error while reading JSON '%v', please manually set config and save", fname)
+		log.Printf("Error while reading JSON '%v', please manually set config and save", fileConfig)
 	}
 	if config.Port == 0 {
 		config.Port = 8081
@@ -162,13 +167,13 @@ func loadConfig() {
 	}
 
 	// Load sunscreen
-	err := readJSON(fileSunscrn, &s)
+	err = readJSON(fileSunscrn, &s)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Load lightsensor
-	err := readJSON(fileLightsensor, &ls)
+	err = readJSON(fileLightsensor, &ls)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -201,5 +206,17 @@ func sendMail(subj, body string) {
 			return
 		}
 		log.Println("Send mail to", config.MailTo)
+	}
+}
+
+// SaveToJson takes an interface and stores it into the filename
+func SaveToJSON(i interface{}, fileName string) {
+	bs, err := json.Marshal(i)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = ioutil.WriteFile(fileName, bs, 0644)
+	if err != nil {
+		log.Fatal("Error", err)
 	}
 }
