@@ -25,38 +25,40 @@ const (
 	fileLight       = "./logs/light_stats.csv"
 )
 
-var ls = &LightSensor{
-	Pin:          rpio.Pin(23),
-	Interval:     time.Duration(time.Minute),
-	LightFactor:  12,
-	Start:        time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Local),
-	Stop:         time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 21, 0, 0, 0, time.Local),
-	Good:         10,
-	Neutral:      15,
-	Bad:          30,
-	TimesGood:    17,
-	TimesNeutral: 20,
-	TimesBad:     6,
-	Outliers:     2,
-	Data:         []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-}
-var s = &Sunscreen{
-	Id:        1000,
-	Name:      "Woonkamer",
-	Mode:      auto,
-	Position:  unknown,
-	DurDown:   time.Duration(16 * time.Second),
-	DurUp:     time.Duration(19 * time.Second),
-	PinDown:   rpio.Pin(21),
-	PinUp:     rpio.Pin(20),
-	AutoStart: true,
-	AutoStop:  true,
-	SunStart:  time.Duration(9720000000000),
-	SunStop:   time.Duration(5400000000000),
-	Start:     time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Local),
-	Stop:      time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 21, 0, 0, 0, time.Local),
-	StopLimit: time.Duration(1800000000000),
-}
+var ls = &LightSensor{}
+
+// Pin:          rpio.Pin(23),
+// Interval:     time.Duration(time.Minute),
+// LightFactor:  12,
+// Start:        time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Local),
+// Stop:         time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 21, 0, 0, 0, time.Local),
+// Good:         10,
+// Neutral:      15,
+// Bad:          30,
+// TimesGood:    17,
+// TimesNeutral: 20,
+// TimesBad:     6,
+// Outliers:     2,
+// Data:         []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+// }
+var s = &Sunscreen{}
+
+// Id:        1000,
+// Name:      "Woonkamer",
+// Mode:      auto,
+// Position:  unknown,
+// DurDown:   time.Duration(16 * time.Second),
+// DurUp:     time.Duration(19 * time.Second),
+// PinDown:   rpio.Pin(21),
+// PinUp:     rpio.Pin(20),
+// AutoStart: true,
+// AutoStop:  true,
+// SunStart:  time.Duration(9720000000000),
+// SunStop:   time.Duration(5400000000000),
+// Start:     time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Local),
+// Stop:      time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 21, 0, 0, 0, time.Local),
+// StopLimit: time.Duration(1800000000000),
+// }
 
 var config Config
 

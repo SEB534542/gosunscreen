@@ -63,13 +63,13 @@ func startServer() {
 	http.HandleFunc("/login", handlerLogin)
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
-	// TODO: change to https
-	log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
-	// err = http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
-	// if err != nil {
-	// 	log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
-	// 	log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
-	// }
+	// TODO: change to https / remove below
+	// log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
+	err := http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
+	if err != nil {
+		log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
+		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
+	}
 }
 
 func handlerLog(w http.ResponseWriter, req *http.Request) {
