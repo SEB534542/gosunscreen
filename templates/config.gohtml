@@ -13,50 +13,46 @@
 <p><a href="/">Click here to go back to home</a></p>
 <p><a href="/config/add">Click here to go set-up a sunscreen</a></p>
 
-{{range .Site.Sunscreens}}	
-	<h2>Sunscreen {{.Name}}</h2>
-	<form action="/config/edit/{{.Id}}" method="POST">
-		{{template "addSunscreen" .}}
-	</form>
-	<!--<a href=delete/{{.Id}}><button>Delete {{.Name}}</button></a>-->
-{{end}}
-
-<h2>Light sensor</h2>
 <form method="POST">
+<h2>Sunscreen</h2>
+	<table>
+	
+	</table>
+<h2>Light sensor</h2>
 	<table>
 		<tr>
-			<td><label for="PinLight">Pin for up</label></td>
-			<td><input type="number" name="PinLight" value="{{.Site.LightSensor.PinLight}}" required></td>
+			<td><label for="LightPin">Pin for up</label></td>
+			<td><input type="number" name="LightPin" value="{{.LightSensor.Pin}}" required></td>
 		</tr>
 		<tr>
-			<td><label for="AllowedOutliers">AllowedOutliers (Number of times)</label></td>
-			<td><input type="number" name="AllowedOutliers" value="{{.Site.LightSensor.AllowedOutliers}}" required></td>
+			<td><label for="Outliers">Allowed Outliers (Number of times)</label></td>
+			<td><input type="number" name="Outliers" value="{{.LightSensor.Outliers}}" required></td>
 		</tr>
     		<tr>
 			<td><label for="Interval">Interval in seconds</label></td>
-			<td><input type="number" name="Interval" value="{{fseconds .Site.LightSensor.Interval}}" required></td>
+			<td><input type="number" name="Interval" value="{{fseconds .LightSensor.Interval}}" required></td>
 		</tr>
 		<tr>
 			<td><label for="LightFactor">Analog value correction</label></td>
-			<td><input type="number" name="LightFactor" value="{{.Site.LightSensor.LightFactor}}" required></td>
+			<td><input type="number" name="LightFactor" value="{{.LightSensor.LightFactor}}" required></td>
 		</tr>
 		<tr>
         <td></td><td>Good</td><td>Neutral</td><td>Bad</td>
       	</tr>
       	<tr>
       		<td>Value</td>
-        	<td><input type="number" name="LightGoodValue" value="{{.Site.LightSensor.LightGoodValue}}" required></td>
-        	<td><input type="number" name="LightNeutralValue" value="{{.Site.LightSensor.LightNeutralValue}}" required></td>
-        	<td><input type="number" name="LightBadValue" value="{{.Site.LightSensor.LightBadValue}}" required></td>
+        	<td><input type="number" name="Good" value="{{.LightSensor.Good}}" required></td>
+        	<td><input type="number" name="Neutral" value="{{.LightSensor.Neutral}}" required></td>
+        	<td><input type="number" name="Bad" value="{{.LightSensor.Bad}}" required></td>
       	</tr> 
 		<tr></tr>
      	<tr>
-	        <td>Threshold</td>
-	        <td><input type="number" name="LightGoodThreshold" value="{{.Site.LightSensor.LightGoodThreshold}}" required></td>
-	        <td><input type="number" name="LightNeutralThreshold" value="{{.Site.LightSensor.LightNeutralThreshold}}" required></td>
-	        <td><input type="number" name="LightBadThreshold" value="{{.Site.LightSensor.LightBadThreshold}}" required></td>
+	        <td>Times</td>
+	        <td><input type="number" name="TimesGood" value="{{.LightSensor.TimesGood}}" required></td>
+	        <td><input type="number" name="TimesNeutral" value="{{.LightSensor.TimesNeutral}}" required></td>
+	        <td><input type="number" name="TimesBad" value="{{.LightSensor.TimesBad}}" required></td>
 		</tr>
-	<table>
+	</table>
 	<h2>Settings</h2>
 	<table>
 		<tr>

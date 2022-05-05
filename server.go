@@ -136,21 +136,14 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		log.Println("Updated configuration")
 	}
 
-	if ls == nil {
-		ls = &LightSensor{}
-	}
-	if s == nil {
-		s = &Sunscreen{}
-	}
-
 	data := struct {
 		Sunscreen
-		lightSensor
+		LightSensor
 		Config
 		Msgs []string
 	}{
-		s,
-		ls,
+		*s,
+		*ls,
 		config,
 		msgs,
 	}
@@ -265,14 +258,14 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 		lighHistory = len(ls.Data)
 	}
 	data := struct {
-		*Sunscreen
+		Sunscreen
 		Time         string
 		RefreshRate  time.Duration
 		Stats        [][]string
 		MoveHistory  int
 		LightHistory int
 	}{
-		s,
+		*s,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate, //int(config.RefreshRate.Seconds()),
 		reverseXSS(stats),
