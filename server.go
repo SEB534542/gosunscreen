@@ -407,82 +407,6 @@ func alreadyLoggedIn(req *http.Request) bool {
 	return true
 }
 
-func updateSunscrn(req *http.Request, s *Sunscreen) []string {
-	var msgs []string
-	appendMsgs := func(msg string) {
-		msgs = append(msgs, msg)
-		log.Println(msg)
-	}
-	s.Name = req.PostFormValue("Name")
-
-	if req.PostFormValue("AutoStart") == "" {
-		s.AutoStart = false
-		start, err := stoTime(req.PostFormValue("Start"), 0)
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Start time '%v' (%v)", start, err))
-		} else {
-			s.Start = start
-		}
-	} else {
-		s.AutoStart = true
-		sunStart, err := time.ParseDuration(req.PostFormValue("SunStart") + "m")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStart, err))
-		} else {
-			s.SunStart = sunStart
-		}
-	}
-	if req.PostFormValue("AutoStop") == "" {
-		s.AutoStop = false
-		stop, err := stoTime(req.PostFormValue("Stop"), 0)
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save Stop time '%v' (%v)", stop, err))
-		} else {
-			s.Stop = stop
-		}
-	} else {
-		s.AutoStop = true
-		sunStop, err := time.ParseDuration(req.PostFormValue("SunStop") + "m")
-		if err != nil {
-			appendMsgs(fmt.Sprintf("Unable to save SunStart '%v' (%v)", sunStop, err))
-		} else {
-			s.SunStop = sunStop
-		}
-	}
-	s.resetAutoTime(0)
-	stopThreshold, err := time.ParseDuration(req.PostFormValue("StopThreshold") + "m")
-	if err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save StopThreshold '%v' (%v)", stopThreshold, err))
-	} else {
-		s.StopThreshold = stopThreshold
-	}
-	durDown, err := time.ParseDuration(req.PostFormValue("DurDown") + "s")
-	if err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save DurDown '%v' (%v)", durDown, err))
-	} else {
-		s.DurDown = durDown
-	}
-	durUp, err := time.ParseDuration(req.PostFormValue("DurUp") + "s")
-	if err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save DurUp '%v' (%v)", durUp, err))
-	} else {
-		s.DurUp = durUp
-	}
-	pinDown, err := strToInt(req.PostFormValue("PinDown"))
-	if !(pinDown > 0 && pinDown < 28) || err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinDown, err))
-	} else {
-		s.PinDown = rpio.Pin(pinDown)
-	}
-	pinUp, err := strToInt(req.PostFormValue("PinUp"))
-	if !(pinUp > 0 && pinUp < 28) || err != nil {
-		appendMsgs(fmt.Sprintf("Unable to save Led Pin '%v' (%v)", pinUp, err))
-	} else {
-		s.PinUp = rpio.Pin(pinUp)
-	}
-	return msgs
-}
-
 // StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
 func stoTime(t string, days int) (time.Time, error) {
 	timeNow := time.Now()
@@ -784,14 +708,10 @@ func readCSV(file string) [][]string {
 	return lines
 }
 
+// Append CSV takes a filename and adds the new lines to the corresponding CSV file
 func appendCSV(file string, newLines [][]string) {
-
-	// Get current data
 	lines := readCSV(file)
-
-	// Add new lines
 	lines = append(lines, newLines...)
-
 	// Write the file
 	f, err := os.Create(file)
 	if err != nil {
@@ -801,4 +721,26 @@ func appendCSV(file string, newLines [][]string) {
 	if err = w.WriteAll(lines); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// strToInt transforms string to an int and returns a positive int or zero
+func strToInt(s string) (int, error) {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	if i < 0 {
+		return 0, err
+	}
+	return i, err
+}
+
+// GetIP gets a requests IP address by reading off the forwarded-for
+// header (for proxies) and falls back to use the remote address.
+func GetIP(req *http.Request) string {
+	forwarded := req.Header.Get("X-FORWARDED-FOR")
+	if forwarded != "" {
+		return forwarded
+	}
+	return req.RemoteAddr
 }

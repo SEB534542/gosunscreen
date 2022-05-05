@@ -173,3 +173,33 @@ func loadConfig() {
 		log.Fatal(err)
 	}
 }
+
+// SendMail sends mail to
+func sendMail(subj, body string) {
+	if config.EnableMail {
+		//Format message
+		var msgTo string
+		for i, s := range config.MailTo {
+			if i != 0 {
+				msgTo = msgTo + ","
+			}
+			msgTo = msgTo + s
+		}
+
+		msg := []byte("To:" + msgTo + "\r\n" +
+			"Subject:" + subj + "\r\n" +
+			"\r\n" + body + "\r\n")
+
+		// Set up authentication information
+		auth := smtp.PlainAuth("", config.MailUser, config.MailPass, config.MailHost)
+
+		// Connect to the server, authenticate, set the sender and recipient,
+		// and send the email all in one step.
+		err := smtp.SendMail(fmt.Sprintf("%v:%v", config.MailHost, config.MailPort), auth, config.MailFrom, config.MailTo, msg)
+		if err != nil {
+			log.Println("Unable to send mail:", err)
+			return
+		}
+		log.Println("Send mail to", config.MailTo)
+	}
+}
