@@ -11,17 +11,26 @@ import (
 /* LightSensor represents a physical lightsensor for which data can be collected
 through the corresponding GPIO pin.*/
 type LightSensor struct {
-	Pin         rpio.Pin      // pin for retrieving light value
-	Interval    time.Duration // Interval for checking current light in seconds
-	LightFactor int           // Factor for correcting the measured analog light value
-	Start       time.Time     // Start time for measuring light
-	Stop        time.Time     // Stop time for measuring light
-	Data        []int         // collected light values
+	Pin          rpio.Pin      // pin for retrieving light value.
+	Interval     time.Duration // Interval for checking current light in seconds.
+	LightFactor  int           // Factor for correcting the measured analog light value.
+	Start        time.Time     // Start time for measuring light.
+	Stop         time.Time     // Stop time for measuring light.
+	Good         int           // Max measured light value that counts as "good weather".
+	TimesGood    int           // Number of times light should be below lightGoodValue.
+	Neutral      int           // Max measured light value that counts as "neutral weather".
+	TimesNeutral int           // Number of times light should be above lightNeutralValue.
+	Bad          int           // max measured light value that counts as "bad weather".
+	TimesBad     int           // number of times light should be above lightBadValue.
+	Outliers     int           // Number of outliers accepted in the measurement.
+	Data         []int         // collected light values.
 }
 
 const (
-	maxCount = 9999999 // Maximum allowed count value while measuring light
-	freq     = 10      // Number of times light is measured to get an average value
+	maxCount                  = 9999999          // Maximum allowed count value while measuring light.
+	freq                      = 10               // Number of times light is measured to get an average value.
+	LightMin                  = 5                // Minimum value that can be stored for LightSensor.Good, Neutral or Bad.
+	IntervalMin time.Duration = time.Second * 60 // Minimum seconds the interval should have
 )
 
 /* GetLight Takes a pin, measures the current light from the sensor on that rpio pin and
@@ -93,14 +102,13 @@ func calcAverage(xi ...int) int {
 	return total / len(xi)
 }
 
-func (ls *LightSensor) Monitor() {
+func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 	for {
 		switch {
 		case time.Now().After(ls.Stop):
 			log.Println("Reset Start and Stop for light monitoring to tomorrow") // TODO: remove(?)
-			// Reset Start and Stop to tomorrow
-			ls.Start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Start.Hour(), ls.Start.Minute(), 0, 0, time.Local)
-			ls.Stop = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, ls.Stop.Hour(), ls.Stop.Minute(), 0, 0, time.Local)
+			// Reset Start and Stop for both Sunscreen and Lightsensor to tomorrow
+			updateStartStop(s, ls, 1)
 			fallthrough
 		case time.Now().Before(ls.Start):
 			log.Printf("Sleep light monitoring for %v until %v", time.Until(ls.Start), ls.Start) // TODO: remove(?)
@@ -116,7 +124,12 @@ func (ls *LightSensor) Monitor() {
 				l := <-light
 				log.Printf("Storing light %v...", l)
 				ls.Data = shiftSlice(ls.Data, l)
-				// TODO: store light into a log file (via go func?)
+				if s != nil {
+					if s.Mode == auto {
+						s.evaluate(ls.data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
+						// TODO: store light into a log file (via go func?)
+					}
+				}
 			}
 			close(quit)
 		}
