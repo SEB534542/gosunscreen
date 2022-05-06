@@ -57,7 +57,6 @@ func (s *Sunscreen) init() {
 	s.PinDown.High()
 	s.PinUp.Output()
 	s.PinUp.High()
-	fmt.Println("Set pins")
 	updateStartStop(s, ls, 0)
 	// TODO: implement s.up() and remove manual correction
 	// s.Up()
@@ -148,6 +147,7 @@ func (s *Sunscreen) resetAutoTime(d int) (err error) {
 		start, stop, err = config.Location.GetSunriseSunset()
 		if err != nil {
 			err = fmt.Errorf("Could not determine sunrise ('%v') and sunset ('%v') for location '%v'. Please try again or set start/stop manually. Error:\n%v", start, stop, config.Location, err)
+			muSunscrn.Unlock()
 			return err
 		}
 	}
