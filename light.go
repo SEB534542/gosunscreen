@@ -120,12 +120,16 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 			light := make(chan int, 2)
 			quit := make(chan bool)
 			go sendLight(ls.Pin, ls.Interval, ls.LightFactor, light, quit)
+			// Receive light
 			for time.Now().After(ls.Start) && time.Now().Before(ls.Stop) {
 				l := <-light
 				log.Printf("Storing light %v...", l)
-				ls.Data = shiftSlice(ls.Data, l)
+				maxL = max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers + 1
+				ls.Data = addData(ls.Data, maxL, l)
 				if s != nil {
-					if s.Mode == auto {
+					m := min(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers
+					// Only evaluatie sunscreen position if enough data has been gathered and mode == auto
+					if len(ls.Data) >= m && s.Mode == auto {
 						s.evaluate(ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
 						// TODO: store light into a log file (via go func?)
 					}
@@ -158,6 +162,18 @@ func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan
 			time.Sleep(interval)
 		}
 	}
+}
+
+func addData(xi []int, maxL, x int) []int {
+	if len(xi) < maxL {
+		xi = append(xi, x)
+		return xi
+	}
+	xi = shiftSlice(xi, x)
+	if len(xi) > maxL {
+		xi = xi[len(xi)-maxL:]
+	}
+	return xi
 }
 
 func shiftSlice(xi []int, x int) []int {
