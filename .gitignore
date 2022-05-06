@@ -60,3 +60,4 @@ builds/**/images/*
 # Executables
 gosunscreen
 main
+app

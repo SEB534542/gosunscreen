@@ -154,6 +154,8 @@ func (s *Sunscreen) evaluate(data []int, good, neutral, bad, timesGood, timesNeu
 				counter++
 			}
 		}
+		// TODO: Remove below
+		fmt.Println("evaluatie from up", counter, timesGood, data)
 		if counter >= timesGood {
 			s.Down()
 			return

@@ -129,7 +129,7 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 				ls.Data = addData(ls.Data, maxL, l)
 				appendCSV(fileLight, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(l)}})
 				if s != nil {
-					m := min(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers
+					m := max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers
 					// Only evaluatie sunscreen position if enough data has been gathered and mode == auto
 					if len(ls.Data) >= m && s.Mode == auto {
 						s.evaluate(ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
