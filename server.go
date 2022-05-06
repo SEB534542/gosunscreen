@@ -50,11 +50,16 @@ func init() {
 }
 
 func startServer() {
+	muConf.Lock()
 	if config.Port == 0 {
 		config.Port = 8081
 		log.Printf("No port configured, using port %v", config.Port)
 	}
-	log.Printf("Launching website at localhost:%v...", config.Port)
+	port := config.Port
+	cert := config.Cert
+	key := config.Key
+	muConf.Unlock()
+	log.Printf("Launching website at localhost:%v...", port)
 	http.HandleFunc("/", handlerMain)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 	http.HandleFunc("/mode/", handlerMode)
@@ -64,10 +69,10 @@ func startServer() {
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
 	http.HandleFunc("/stop", handlerStop)
-	err := http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
+	err := http.ListenAndServeTLS(":"+fmt.Sprint(port), cert, key, nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
-		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
+		log.Fatal(http.ListenAndServe(":"+fmt.Sprint(port), nil))
 	}
 }
 

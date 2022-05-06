@@ -62,10 +62,13 @@ func main() {
 
 	// Open connection RPIO pins
 	rpio.Open()
-
+	fmt.Println("opened pins")
 	loadConfig()
+	fmt.Println("loaded config")
 	s.init()
+	fmt.Println("init s")
 	updateStartStop(s, ls, 0)
+	fmt.Println("updatess done")
 
 	log.Println("Starting monitor")
 	if ls != nil {
