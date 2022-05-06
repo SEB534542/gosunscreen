@@ -89,7 +89,7 @@ func (s *Sunscreen) Move() {
 	// new := s.Position
 	// mode := s.Mode
 	// sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s.", old, new))
-	appendCSV(fileStats, [][]string{{time.Now().Format("02-01-2006 15:04:05"), old, s.Mode, fmt.Sprint(ls.Data)}})
+	appendCSV(fileStats, [][]string{{time.Now().Format("02-01-2006 15:04:05"), s.Mode, s.Position, fmt.Sprint(ls.Data)}})
 	SaveToJSON(s, fileSunscrn)
 }
 
@@ -154,8 +154,6 @@ func (s *Sunscreen) evaluate(data []int, good, neutral, bad, timesGood, timesNeu
 				counter++
 			}
 		}
-		// TODO: Remove below
-		fmt.Println("evaluatie from up", counter, timesGood, data)
 		if counter >= timesGood {
 			s.Down()
 			return
