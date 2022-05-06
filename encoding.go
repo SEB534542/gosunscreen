@@ -29,13 +29,12 @@ func readJSON(fname string, i interface{}) error {
 		SaveToJSON(i, fname)
 	} else {
 		data, err := ioutil.ReadFile(fname)
-		// TODO: remove file and create new
 		if err != nil {
-			return fmt.Errorf("%s is corrupt. Please delete the file (%v)", fname, err)
+			return fmt.Errorf("%s is corrupt. Please correct or delete the file (%v)", fname, err)
 		}
 		err = json.Unmarshal(data, i)
 		if err != nil {
-			return fmt.Errorf("%s is corrupt. Please delete the file (%v)", fname, err)
+			return fmt.Errorf("%s is corrupt. Please correct or delete the file (%v)", fname, err)
 		}
 	}
 	return nil
@@ -74,5 +73,4 @@ func loadConfig() {
 		log.Fatal(err)
 	}
 	ls.Data = []int{} // Make sure data is empty (since restarted)
-	// TODO: ensure that if ls is stored (saveJSON), data is stored empty(?)
 }

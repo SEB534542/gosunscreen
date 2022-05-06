@@ -57,8 +57,6 @@ func getLight(pin rpio.Pin) (int, error) {
 	return count, nil
 }
 
-// TODO: ensure that output from GetCurrentLight() is divided by LightFactor in main code section.
-
 /* GetCurrentLight takes a pin and frequency, collects the input from the light
 sensor on that rpio pin and returns the average value as a slice of int together
 with any errors. If int returned is zero, it means no light was measured
@@ -85,7 +83,7 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	case len(values) == 0:
 		err = fmt.Errorf("All %v attempts failed. Errors:%v", freq, errs)
 	case len(values) != freq:
-		err = fmt.Errorf("%v/%v attempts failed. %v Errors:%v", freq-len(values), freq, values, errs) // TODO: remove values
+		err = fmt.Errorf("%v/%v attempts failed. %v Errors:%v", freq-len(values), freq, values, errs)
 	}
 	return x, err
 }
@@ -107,16 +105,16 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 	for {
 		switch {
 		case time.Now().After(ls.Stop):
-			log.Println("Reset Start and Stop for light monitoring to tomorrow") // TODO: remove(?)
+			log.Println("Reset Start and Stop for light monitoring to tomorrow")
 			// Reset Start and Stop for both Sunscreen and Lightsensor to tomorrow
 			updateStartStop(s, ls, 1)
 			fallthrough
 		case time.Now().Before(ls.Start):
-			log.Printf("Sleep light monitoring for %v until %v", time.Until(ls.Start), ls.Start) // TODO: remove(?)
+			log.Printf("Sleep light monitoring for %v until %v", time.Until(ls.Start), ls.Start)
 			// Sleep until Start
 			time.Sleep(time.Until(ls.Start))
 		default:
-			log.Printf("Start monitoring light every %v", ls.Interval) // TODO: remove(?)
+			log.Printf("Start monitoring light every %v", ls.Interval)
 			// Monitor light
 			light := make(chan int, 2)
 			quit := make(chan bool)
@@ -183,8 +181,4 @@ func shiftSlice(xi []int, x int) []int {
 	}
 	xi[0] = x
 	return xi
-}
-
-func (ls *LightSensor) reset() {
-	// TODO based on outliers + max times
 }

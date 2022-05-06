@@ -70,6 +70,8 @@ func init() {
 	}
 }
 
+// TODO: review global/local funcs and vars
+
 func main() {
 	// TODO: check if below can be stored in a separate func
 	// Open logfile or create if not exists
@@ -84,18 +86,12 @@ func main() {
 
 	// Open connection RPIO pins
 	rpio.Open()
-	defer rpio.Close()
 
 	loadConfig()
 	s.init()
 	ls.reset()
-
 	updateStartStop(s, ls, 0)
-	// TODO: Include a stop option with below (like greenhouse)
-	defer func() {
-		log.Println("Closing down...")
-		s.Up()
-	}()
+
 	log.Println("Starting monitor")
 	if ls != nil {
 		go ls.MonitorMove(s)

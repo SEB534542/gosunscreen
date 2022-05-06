@@ -63,8 +63,7 @@ func startServer() {
 	http.HandleFunc("/login", handlerLogin)
 	http.HandleFunc("/logout", handlerLogout)
 	http.HandleFunc("/light", handlerLight)
-	// TODO: change to https / remove below
-	// log.Fatal(http.ListenAndServe(":"+fmt.Sprint(config.Port), nil))
+	http.HandleFunc("/stop", handlerStop)
 	err := http.ListenAndServeTLS(":"+fmt.Sprint(config.Port), config.Cert, config.Key, nil)
 	if err != nil {
 		log.Println("ERROR: Unable to launch TLS, launching without TLS...", err)
@@ -757,4 +756,12 @@ func stringToSlice(s string) []string {
 		xs[i] = strings.Trim(v, " ")
 	}
 	return xs
+}
+
+func handlerStop(w http.ResponseWriter, req *http.Request) {
+	log.Println("Closing down...")
+	s.Up()
+	rpio.Close()
+	log.Println("Shutting down")
+	os.Exit(3)
 }
