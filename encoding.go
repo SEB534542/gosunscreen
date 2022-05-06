@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"time"
 )
@@ -52,10 +54,7 @@ func loadConfig() {
 	}
 	if config.Username == "" {
 		config.Username = "admin"
-		pw, err := bcrypt.GenerateFromPassword([]byte("today"), bcrypt.MinCost)
-		if err != nil {
-			log.Fatal("Error setting default password:", err)
-		}
+		pw := []uint8{36, 50, 97, 36, 48, 52, 36, 71, 89, 66, 56, 116, 79, 102, 65, 57, 52, 84, 114, 82, 46, 107, 89, 65, 65, 71, 73, 77, 79, 76, 108, 81, 69, 114, 99, 68, 104, 52, 88, 81, 79, 89, 115, 81, 78, 99, 69, 53, 53, 73, 73, 97, 73, 114, 71, 70, 50, 81, 103, 46}
 		config.Password = pw
 	}
 	if config.RefreshRate == time.Duration(0) {

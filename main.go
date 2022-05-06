@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Constants for config folder and files
@@ -88,7 +87,7 @@ func main() {
 	defer rpio.Close()
 
 	loadConfig()
-	s.initPins()
+	s.init()
 	ls.reset()
 
 	updateStartStop(s, ls, 0)
@@ -124,9 +123,9 @@ func max(xi ...int) int {
 	return x
 }
 
-// Min takes multiple int and returns the highest value. It always returns a minimum of 1000000000000.
+// Min takes multiple int and returns the highest value. It always returns a minimum of 100000000.
 func min(xi ...int) int {
-	x := 1000000000000
+	x := 100000000
 	for _, v := range xi {
 		if v < x {
 			x = v

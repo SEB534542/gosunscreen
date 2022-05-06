@@ -52,12 +52,16 @@ func move(pin rpio.Pin, dur time.Duration) {
 }
 
 // Init initiates the sunscreen
-func (s *Sunscreen) initPins() {
+func (s *Sunscreen) init() {
 	s.PinDown.Output()
 	s.PinDown.High()
 	s.PinUp.Output()
 	s.PinUp.High()
 	updateStartStop(s, ls, 0)
+	// TODO: implement s.up() and remove manual correction
+	// s.Up()
+	s.Mode = auto
+	s.Position = up
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -85,9 +89,8 @@ func (s *Sunscreen) Move() {
 	// new := s.Position
 	// mode := s.Mode
 	// sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s.", old, new))
-	// TODO: Store data in csv?
-	// appendCSV(csvFile, [][]string{{time.Now().Format("02-01-2006 15:04:05"), mode, new, fmt.Sprint(site.LightSensor.Data)}})
-	// SaveToJson(site, siteFile)
+	appendCSV(fileStats, [][]string{{time.Now().Format("02-01-2006 15:04:05"), old, s.Mode, fmt.Sprint(ls.Data)}})
+	SaveToJSON(s, fileSunscrn)
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().

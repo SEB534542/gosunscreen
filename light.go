@@ -67,10 +67,12 @@ the attempts failed (ie errors generated), but a light value was measured.*/
 func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	values := []int{}
 	var errs string
+	var err error
 	i := 0
 	for i < freq {
-		value, err := getLight(pin)
-		if err != nil {
+		value, err2 := getLight(pin)
+		if err2 != nil && err2 != err {
+			err = err2
 			errs = fmt.Sprintf("%v\n\t%v", errs, err)
 		}
 		values = append(values, value)
@@ -79,11 +81,10 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 	x := calcAverage(values...)
 
 	// Error handling
-	var err error
 	switch {
 	case len(values) == 0:
 		err = fmt.Errorf("All %v attempts failed. Errors:%v", freq, errs)
-	case len(values) != freq || x == 0:
+	case len(values) != freq:
 		err = fmt.Errorf("%v/%v attempts failed. %v Errors:%v", freq-len(values), freq, values, errs) // TODO: remove values
 	}
 	return x, err
@@ -123,15 +124,15 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 			// Receive light
 			for time.Now().After(ls.Start) && time.Now().Before(ls.Stop) {
 				l := <-light
-				log.Printf("Storing light %v...", l)
-				maxL = max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers + 1
+				// Saving light
+				maxL := max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers + 1
 				ls.Data = addData(ls.Data, maxL, l)
+				appendCSV(fileLight, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(l)}})
 				if s != nil {
 					m := min(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers
 					// Only evaluatie sunscreen position if enough data has been gathered and mode == auto
 					if len(ls.Data) >= m && s.Mode == auto {
 						s.evaluate(ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
-						// TODO: store light into a log file (via go func?)
 					}
 				}
 			}
@@ -146,7 +147,7 @@ func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan
 	for {
 		select {
 		case _, _ = <-quit:
-			log.Println("Closing monitorLight") // TODO: remove from log?
+			log.Println("Closing monitorLight")
 			return
 		default:
 			l, err := getAvgLight(pin, freq)
@@ -154,7 +155,7 @@ func sendLight(pin rpio.Pin, interval time.Duration, lightFactor int, light chan
 			// Errorhandling
 			switch {
 			case l == 0:
-				log.Printf("No light gathered. Errors: %v", err)
+				log.Printf("Zero light gathered. Errors: %v", err)
 			case err != nil:
 				log.Printf("Light gathered: %v with errors: %v", l, err)
 			}
