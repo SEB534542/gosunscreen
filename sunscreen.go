@@ -168,7 +168,7 @@ func (s *Sunscreen) evaluate(data []int, good, neutral, bad, timesGood, timesNeu
 	muSunscrn.Lock()
 	position := s.Position
 	muSunscrn.Unlock()
-	switch s.Position {
+	switch position {
 	case up:
 		for _, v := range data[:(timesGood + outliers)] {
 			if v <= good {

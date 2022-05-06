@@ -30,9 +30,9 @@ var (
 )
 
 var (
-	muSunscrn = sync.Mutex
-	muLS      = sync.Mutex
-	muConf    = sync.Mutex
+	muSunscrn sync.Mutex
+	muLS      sync.Mutex
+	muConf    sync.Mutex
 )
 
 func init() {
@@ -65,7 +65,6 @@ func main() {
 
 	loadConfig()
 	s.init()
-	ls.reset()
 	updateStartStop(s, ls, 0)
 
 	log.Println("Starting monitor")
