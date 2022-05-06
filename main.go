@@ -91,6 +91,8 @@ func main() {
 
 	loadConfig()
 	s.initPins()
+	ls.reset()
+
 	updateStartStop(s, ls, 0)
 	// TODO: Include a stop option with below (like greenhouse)
 	defer func() {

@@ -272,7 +272,8 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 		lighHistory = len(ls.Data)
 	}
 	data := struct {
-		Sunscreen
+		S            Sunscreen
+		LS           LightSensor
 		Time         string
 		RefreshRate  time.Duration
 		Stats        [][]string
@@ -280,6 +281,7 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 		LightHistory int
 	}{
 		*s,
+		*ls,
 		time.Now().Format("_2 Jan 06 15:04:05"),
 		config.RefreshRate, //int(config.RefreshRate.Seconds()),
 		reverseXSS(stats),

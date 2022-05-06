@@ -167,3 +167,7 @@ func shiftSlice(xi []int, x int) []int {
 	xi[0] = x
 	return xi
 }
+
+func (ls *LightSensor) reset() {
+	// TODO based on outliers + max times
+}
