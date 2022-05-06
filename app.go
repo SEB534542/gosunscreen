@@ -62,13 +62,9 @@ func main() {
 
 	// Open connection RPIO pins
 	rpio.Open()
-	fmt.Println("opened pins")
 	loadConfig()
-	fmt.Println("loaded config")
 	s.init()
-	fmt.Println("init s")
 	updateStartStop(s, ls, 0)
-	fmt.Println("updatess done")
 
 	log.Println("Starting monitor")
 	if ls != nil {
@@ -80,6 +76,7 @@ func main() {
 // UpdateStartStop resets all start/stop to today + d (e.g. d=0 resets it to today.
 func updateStartStop(s *Sunscreen, ls *LightSensor, d int) {
 	s.resetStartStop(d)
+	fmt.Println("done resetss sunscreen")
 	// Light sensor should start in time so at sunscreen start enough light has been gathered
 	muLS.Lock()
 	dur := time.Duration((max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad)+ls.Outliers)/int(ls.Interval.Minutes())) * time.Minute
