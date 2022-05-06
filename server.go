@@ -262,11 +262,13 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 	}
 
 	stats := readCSV(fileStats)
-	//mu.Lock()
+	muConf.Lock()
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-config.MoveHistory):]
 	}
 	var lighHistory int
+	muLS.Lock()
+	muSunscrn.Lock()
 	if ls != nil {
 		lighHistory = len(ls.Data)
 	}
@@ -287,7 +289,9 @@ func handlerMain(w http.ResponseWriter, req *http.Request) {
 		config.MoveHistory,
 		lighHistory,
 	}
-	//mu.Unlock()
+	muSunscrn.Unlock()
+	muLS.Unlock()
+	muConf.Unlock()
 	err := tpl.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
@@ -299,8 +303,8 @@ func handlerLight(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/login", http.StatusSeeOther)
 		return
 	}
-	//mu.Lock()
 	stats := readCSV(fileLight)
+	muConf.Lock()
 	if len(stats) != 0 {
 		stats = stats[MaxIntSlice(0, len(stats)-config.LogRecords):]
 	}
@@ -309,7 +313,7 @@ func handlerLight(w http.ResponseWriter, req *http.Request) {
 	}{
 		reverseXSS(stats),
 	}
-	////mu.Unlock()
+	muConf.Unlock()
 	err := tpl.ExecuteTemplate(w, "light.gohtml", data)
 	if err != nil {
 		log.Fatalln(err)
@@ -325,7 +329,7 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 	// Url options: '/mode/auto" or '/mode/manual/up' or '/mode/manual/down'
 	idMode := req.URL.Path[len("/mode/"):]
 	mode := idMode[strings.Index(idMode, "/")+1:]
-	//mu.Lock()
+	muSunscrn.Lock()
 	switch mode {
 	case auto:
 		if s.Mode != auto {
@@ -340,18 +344,18 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 			s.Mode = manual
 			SaveToJSON(s, fileSunscrn)
 		}
-		s.Up()
+		go s.Up()
 	case manual + "/" + down:
 		if s.Mode != manual {
 			s.Mode = manual
 			SaveToJSON(s, fileSunscrn)
 		}
-		s.Down()
+		go s.Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
 	}
+	muSunscrn.Unlock()
 	// TODO: remove this log? log.Println("Mode=", site.Sunscreens[i].Mode, "and Position=", site.Sunscreens[i].Position)
-	//mu.Unlock()
 	http.Redirect(w, req, "/", http.StatusFound)
 }
 
@@ -394,7 +398,10 @@ func alreadyLoggedIn(req *http.Request) bool {
 		return false
 	}
 	un := dbSessions[c.Value]
-	if un != config.Username {
+	muConf.Lock()
+	username := config.Username
+	muConf.Unlock()
+	if un != username {
 		// Unknown cookie
 		return false
 	}
@@ -404,12 +411,10 @@ func alreadyLoggedIn(req *http.Request) bool {
 // StoTime receives a string of time (format hh:mm) and a day offset, and returns a type time with today's and the supplied hours and minutes + the offset in days
 func stoTime(t string, days int) (time.Time, error) {
 	timeNow := time.Now()
-
 	timeHour, err := strconv.Atoi(t[:2])
 	if err != nil {
 		return time.Time{}, err
 	}
-
 	timeMinute, err := strconv.Atoi(t[3:])
 	if err != nil {
 		return time.Time{}, err
@@ -419,6 +424,7 @@ func stoTime(t string, days int) (time.Time, error) {
 }
 
 func updateSunscreen(req *http.Request) []string {
+	muSunscrn.Lock()
 	if s == nil {
 		s = &Sunscreen{}
 	}
@@ -492,6 +498,7 @@ func updateSunscreen(req *http.Request) []string {
 	} else {
 		s.PinUp = rpio.Pin(pinUp)
 	}
+	muSunscrn.Unlock()
 	return msgs
 }
 
@@ -502,7 +509,7 @@ func updateLightsensor(req *http.Request) []string {
 		msgs = append(msgs, msg)
 		log.Println(msg)
 	}
-
+	muLS.Lock()
 	good, err := strToInt(req.PostFormValue("Good"))
 	if err != nil {
 		appendMsgs(fmt.Sprintf("Unable to save Light Good Value: %v", err))
@@ -584,6 +591,7 @@ func updateLightsensor(req *http.Request) []string {
 	} else {
 		ls.Interval = interval
 	}
+	muLS.Unlock()
 	return msgs
 }
 
@@ -594,7 +602,7 @@ func updateConfig(req *http.Request) []string {
 		msgs = append(msgs, msg)
 		log.Println(msg)
 	}
-
+	muConf.Lock()
 	// Read, validate and store config
 	refreshRate, err := time.ParseDuration(req.PostFormValue("RefreshRate") + "m")
 	if err != nil {
@@ -679,6 +687,7 @@ func updateConfig(req *http.Request) []string {
 	} else {
 		config.Location.UtcOffset = utcOffset
 	}
+	muConf.Unlock()
 	return msgs
 }
 

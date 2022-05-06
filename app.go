@@ -29,6 +29,12 @@ var (
 	config Config
 )
 
+var (
+	muSunscrn = sync.Mutex
+	muLS      = sync.Mutex
+	muConf    = sync.Mutex
+)
+
 func init() {
 	// Check if log folder exists, else create
 	if _, err := os.Stat(folderLog); os.IsNotExist(err) {
@@ -73,9 +79,11 @@ func main() {
 func updateStartStop(s *Sunscreen, ls *LightSensor, d int) {
 	s.resetStartStop(d)
 	// Light sensor should start in time so at sunscreen start enough light has been gathered
+	muLS.Lock()
 	dur := time.Duration((max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad)+ls.Outliers)/int(ls.Interval.Minutes())) * time.Minute
 	ls.Start = s.Start.Add(-dur)
 	ls.Stop = s.Stop.Add(time.Duration(30 * time.Minute))
+	muLS.Unlock()
 }
 
 // Max takes multiple int and returns the highest value. It always returns a minimum of zero.

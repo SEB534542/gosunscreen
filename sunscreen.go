@@ -66,44 +66,58 @@ func (s *Sunscreen) init() {
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
 func (s *Sunscreen) Move() {
-	old := s.Position
+	muSunscrn.Lock()
+	oldPos := s.Position
+	oldMode := s.Mode
+	moveSunscrn := func(newPos string) {
+		log.Printf("Moving sunscreen from %v to %v", oldPos, newPos)
+		s.Position = moving
+		muSunscrn.Unlock()
+		move(s.PinDown, s.DurDown)
+		muSunscrn.Lock()
+		s.Position = newPos
+		SaveToJSON(s, fileSunscrn)
+		muSunscrn.Unlock()
+		muLS.Lock()
+		data := ls.Data
+		muLS.Unlock()
+		appendCSV(fileStats, [][]string{{time.Now().Format("02-01-2006 15:04:05"), oldMode, newPos, fmt.Sprint(data)}})
+	}
 	switch s.Position {
 	case unknown, down:
-		new := up
-		log.Printf("Moving sunscreen from %v to %v", old, new)
-		s.Position = moving
-		move(s.PinUp, s.DurUp)
-		s.Position = new
+		moveSunscrn(up)
 	case up:
-		new := down
-		log.Printf("Moving sunscreen from %v to %v", old, new)
-		s.Position = moving
-		move(s.PinDown, s.DurDown)
-		s.Position = new
+		moveSunscrn(down)
 	case moving:
+		muSunscrn.Unlock()
 		log.Printf("Sunscreen is moving already, do nothing")
 	default:
+		muSunscrn.Unlock()
 		log.Fatalf("Unknown sunscreen position: '%v'", s.Position)
 	}
 	// TODO: Configure send mail
-	// new := s.Position
-	// mode := s.Mode
 	// sendMail("Moved sunscreen "+new, fmt.Sprintf("Sunscreen moved from %s to %s.", old, new))
-	appendCSV(fileStats, [][]string{{time.Now().Format("02-01-2006 15:04:05"), s.Mode, s.Position, fmt.Sprint(ls.Data)}})
-	SaveToJSON(s, fileSunscrn)
 }
 
 // Up checks if the suncreen's position is up. If not, it moves the suncreen up through method move().
 func (s *Sunscreen) Up() {
+	muSunscrn.Lock()
 	if s.Position != up {
+		muSunscrn.Unlock()
 		s.Move()
+	} else {
+		muSunscrn.Unlock()
 	}
 }
 
 // Down checks if s suncreen position is down. If not, it moves s suncreen down through method move().
 func (s *Sunscreen) Down() {
+	muSunscrn.Lock()
 	if s.Position != down {
+		muSunscrn.Unlock()
 		s.Move()
+	} else {
+		muSunscrn.Unlock()
 	}
 }
 
@@ -111,6 +125,7 @@ func (s *Sunscreen) resetStartStop(d int) (err error) {
 	resetDate := func(h, m, d int) time.Time {
 		return time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), h, m, 0, 0, time.Now().Location()).AddDate(0, 0, d)
 	}
+	muSunscrn.Lock()
 	if s.AutoStart || s.AutoStop {
 		err = s.resetAutoTime(d)
 	}
@@ -120,11 +135,13 @@ func (s *Sunscreen) resetStartStop(d int) (err error) {
 	if !s.AutoStop {
 		s.Stop = resetDate(s.Stop.Hour(), s.Stop.Minute(), d)
 	}
+	muSunscrn.Unlock()
 	return
 }
 
 func (s *Sunscreen) resetAutoTime(d int) (err error) {
 	var start, stop time.Time
+	muSunscrn.Lock()
 	if s.AutoStart || s.AutoStop {
 		config.Location.Date = time.Now().AddDate(0, 0, d)
 		start, stop, err = config.Location.GetSunriseSunset()
@@ -139,6 +156,7 @@ func (s *Sunscreen) resetAutoTime(d int) (err error) {
 	if s.AutoStop {
 		s.Stop = stop.Add(-s.SunStop)
 	}
+	muSunscrn.Unlock()
 	return nil
 }
 
@@ -147,6 +165,9 @@ parameters from the ligth sensor and moves the Sunscreen up or down if it
 meets the criteria.*/
 func (s *Sunscreen) evaluate(data []int, good, neutral, bad, timesGood, timesNeutral, timesBad, outliers int) {
 	counter := 0
+	muSunscrn.Lock()
+	position := s.Position
+	muSunscrn.Unlock()
 	switch s.Position {
 	case up:
 		for _, v := range data[:(timesGood + outliers)] {

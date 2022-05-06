@@ -40,7 +40,9 @@ func readJSON(fname string, i interface{}) error {
 	return nil
 }
 
-// LoadConfig reads the JSON file from fname and does some initial checks.
+/*LoadConfig reads the JSON file from fname and does some initial checks.
+This should only be called at start-up when no race conditions can occur,
+since no mutex is implemented in this func.*/
 func loadConfig() {
 	// Load config
 	err := readJSON(fileConfig, &config)

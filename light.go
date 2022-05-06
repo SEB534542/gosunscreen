@@ -103,6 +103,7 @@ func calcAverage(xi ...int) int {
 
 func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 	for {
+		muLS.Lock()
 		switch {
 		case time.Now().After(ls.Stop):
 			log.Println("Reset Start and Stop for light monitoring to tomorrow")
@@ -112,7 +113,9 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 		case time.Now().Before(ls.Start):
 			log.Printf("Sleep light monitoring for %v until %v", time.Until(ls.Start), ls.Start)
 			// Sleep until Start
-			time.Sleep(time.Until(ls.Start))
+			d := time.Until(ls.Start)
+			muLS.Unlock()
+			time.Sleep(d)
 		default:
 			log.Printf("Start monitoring light every %v", ls.Interval)
 			// Monitor light
@@ -121,17 +124,26 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 			go sendLight(ls.Pin, ls.Interval, ls.LightFactor, light, quit)
 			// Receive light
 			for time.Now().After(ls.Start) && time.Now().Before(ls.Stop) {
+				muLS.Unlock()
 				l := <-light
 				// Saving light
+				muLS.Lock()
 				maxL := max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers + 1
 				ls.Data = addData(ls.Data, maxL, l)
 				appendCSV(fileLight, [][]string{{time.Now().Format("02-01-2006 15:04:05"), fmt.Sprint(l)}})
 				if s != nil {
-					m := max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad) + ls.Outliers
+					data, good, neutral, bad, tGood, tNeutral, tBad, outliers := ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers
+					muLS.Unlock()
+					m := max(tGood, tNeutral, tBad) + outliers
+					muSunscrn.Lock()
+					mode := s.Mode
+					muSunscrn.Unlock()
 					// Only evaluatie sunscreen position if enough data has been gathered and mode == auto
-					if len(ls.Data) >= m && s.Mode == auto {
-						s.evaluate(ls.Data, ls.Good, ls.Neutral, ls.Bad, ls.TimesGood, ls.TimesNeutral, ls.TimesBad, ls.Outliers)
+					if len(data) >= m && mode == auto {
+						s.evaluate(data, good, neutral, bad, tGood, tNeutral, tBad, outliers)
 					}
+				} else {
+					muLS.Unlock()
 				}
 			}
 			close(quit)
