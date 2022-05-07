@@ -48,40 +48,39 @@
 </table>
 
 <p>
-  <a href="config">Change configuration</a> / 
-  <a href="log">View log</a> / 
-  <a href="light">Light</a> / 
-  <a href="logout">Logout</a> /
+  <a href="config">Change configuration</a> |
+  <a href="log">View log</a> |
+  <a href="light">Light</a> |
+  <a href="logout">Logout</a> |
   <a href="stop">Shutdown</a>
 </p>
 
-<table cellpadding="10">
-<tr>
+
 {{if gt .LightHistory 0}}
-<td valign="top"><h2>Light</h2>
+<h2>Light</h2>
 <table border="0" CELLSPACING=5><tr><td><b>Light new to old</b></td></tr>
-{{range $index, $element := .LS.Data}}
-    <tr><td><li>{{$element}}</li></td></tr>
-{{end}}
+	<tr>
+		{{range $index, $element := .LS.Data}}
+			<td>{{$element}}</td>
+		{{end}}
+	</tr>
 </table>
-</td>
 {{end}}
 
 {{if gt .MoveHistory 0}}
-<td valign="top"><h2>Sunscreen Movements</h2>
+<h2>Sunscreen Movements</h2>
 <table border="0" CELLSPACING=5>
 <tr><td><b>Datetime</b></td><td><b>Mode</b></td><td><b>To</b></td><td><b>Light (new to old)</b></td></tr></b>
 {{range .Stats}}
 	<tr>
-	{{range .}}
-		<td>{{.}}</td>
-	{{end}}
+		<td>{{index . 0}}</td>
+		<td>{{index . 1}}</td>
+		<td>{{index . 2}}</td>
+		<td>{{fsliceString index . 3}}</td>
 	</tr>
 {{end}}
 </table>
-</td>
 {{end}}
-</tr></table>
 
 <p><i>Version 2.0.0</i></p>
 </body>
