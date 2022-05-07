@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/smtp"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
@@ -59,7 +58,6 @@ func main() {
 
 	loadConfig()
 	s.init()
-	ls.reset()
 	updateStartStop(s, ls, 0)
 
 	log.Println("Starting monitor")
