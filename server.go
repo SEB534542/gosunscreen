@@ -773,6 +773,11 @@ func stringToSlice(s string) []string {
 }
 
 func handlerStop(w http.ResponseWriter, req *http.Request) {
+	if !alreadyLoggedIn(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
+
 	log.Println("Closing down...")
 	s.Up()
 	rpio.Close()
