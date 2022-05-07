@@ -132,11 +132,12 @@ func (s *Sunscreen) resetStartStop(d int) (err error) {
 	}
 	if !s.AutoStart {
 		s.Start = resetDate(s.Start.Hour(), s.Start.Minute(), d)
+		muSunscrn.Unlock()
 	}
 	if !s.AutoStop {
 		s.Stop = resetDate(s.Stop.Hour(), s.Stop.Minute(), d)
+		muSunscrn.Unlock()
 	}
-	muSunscrn.Unlock()
 	return
 }
 
