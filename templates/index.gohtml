@@ -57,8 +57,7 @@
 
 
 {{if gt .LightHistory 0}}
-<h2>Light</h2>
-<table border="0" CELLSPACING=5><tr><td><b>Light new to old</b></td></tr>
+<h3>Light (new to old)</h3>
 	<tr>
 		{{range $index, $element := .LS.Data}}
 			<td>{{$element}}</td>
@@ -68,7 +67,7 @@
 {{end}}
 
 {{if gt .MoveHistory 0}}
-<h2>Sunscreen Movements</h2>
+<h3>Sunscreen Movements</h3>
 <table border="0" CELLSPACING=5>
 <tr><td><b>Datetime</b></td><td><b>Mode</b></td><td><b>To</b></td><td><b>Light (new to old)</b></td></tr></b>
 {{range .Stats}}
@@ -76,7 +75,7 @@
 		<td>{{index . 0}}</td>
 		<td>{{index . 1}}</td>
 		<td>{{index . 2}}</td>
-		<td>{{fsliceString index . 3}}</td>
+		<td>{{fspacecomma (index . 3)}}</td>
 	</tr>
 {{end}}
 </table>

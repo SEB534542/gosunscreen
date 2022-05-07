@@ -40,7 +40,7 @@ type Config struct {
 
 var (
 	tpl        *template.Template
-	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": sliceToString, "fminutes": minutes, "fseconds": seconds}
+	fm         = template.FuncMap{"fdateHM": hourMinute, "fsliceString": sliceToString, "fminutes": minutes, "fseconds": seconds, "fspacecomma": spaceToComma}
 	dbSessions = map[string]string{}
 )
 
@@ -762,6 +762,10 @@ func MaxIntSlice(xi ...int) int {
 		}
 	}
 	return max
+}
+
+func spaceToComma(s string) string {
+	return strings.Replace(s, " ", ",", -1)
 }
 
 func stringToSlice(s string) []string {
