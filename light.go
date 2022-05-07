@@ -144,10 +144,10 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 					if len(data) >= m && mode == auto {
 						s.evaluate(data, good, neutral, bad, tGood, tNeutral, tBad, outliers)
 					}
-				} else {
-					muLS.Unlock()
+					muLS.Lock()
 				}
 			}
+			muLS.Unlock()
 			close(quit)
 		}
 	}
