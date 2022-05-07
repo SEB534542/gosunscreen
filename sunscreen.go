@@ -127,6 +127,7 @@ func (s *Sunscreen) resetStartStop(d int) (err error) {
 	}
 	muSunscrn.Lock()
 	if s.AutoStart || s.AutoStop {
+		muSunscrn.Unlock()
 		err = s.resetAutoTime(d)
 	}
 	if !s.AutoStart {
