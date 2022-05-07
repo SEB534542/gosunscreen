@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/smtp"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
