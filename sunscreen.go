@@ -57,7 +57,6 @@ func (s *Sunscreen) init() {
 	s.PinDown.High()
 	s.PinUp.Output()
 	s.PinUp.High()
-	updateStartStop(s, ls, 0)
 	// TODO: implement s.up() and remove manual correction
 	s.Up()
 	//s.Mode = auto

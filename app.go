@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/smtp"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/stianeikeland/go-rpio/v4"
@@ -75,7 +76,6 @@ func main() {
 // UpdateStartStop resets all start/stop to today + d (e.g. d=0 resets it to today.
 func updateStartStop(s *Sunscreen, ls *LightSensor, d int) {
 	s.resetStartStop(d)
-	fmt.Println("done resets sunscreen")
 	// Light sensor should start in time so at sunscreen start enough light has been gathered
 	muLS.Lock()
 	dur := time.Duration((max(ls.TimesGood, ls.TimesNeutral, ls.TimesBad)+ls.Outliers)/int(ls.Interval.Minutes())) * time.Minute
