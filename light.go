@@ -106,6 +106,13 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 		muLS.Lock()
 		switch {
 		case time.Now().After(ls.Stop):
+			muSunscrn.Lock()
+			if s.Mode == auto {
+				muSunscrn.Unlock()
+				s.Up()
+			} else {
+				muSunscrn.Unlock()
+			}
 			log.Println("Reset Start and Stop for light monitoring to tomorrow")
 			// Reset Start and Stop for both Sunscreen and Lightsensor to tomorrow
 			muLS.Unlock()
@@ -114,6 +121,13 @@ func (ls *LightSensor) MonitorMove(s *Sunscreen) {
 			fallthrough
 		case time.Now().Before(ls.Start):
 			log.Printf("Sleep light monitoring for %v until %v", time.Until(ls.Start), ls.Start)
+			muSunscrn.Lock()
+			if s.Mode == auto {
+				muSunscrn.Unlock()
+				s.Up()
+			} else {
+				muSunscrn.Unlock()
+			}
 			// Sleep until Start
 			d := time.Until(ls.Start)
 			muLS.Unlock()

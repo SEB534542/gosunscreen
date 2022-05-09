@@ -58,9 +58,9 @@ func (s *Sunscreen) init() {
 	s.PinUp.Output()
 	s.PinUp.High()
 	// TODO: implement s.up() and remove manual correction
-	// s.Up()
-	s.Mode = auto
-	s.Position = up
+	s.Up()
+	// s.Mode = auto
+	// s.Position = down
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
@@ -71,8 +71,16 @@ func (s *Sunscreen) Move() {
 	moveSunscrn := func(newPos string) {
 		log.Printf("Moving sunscreen from %v to %v", oldPos, newPos)
 		s.Position = moving
+		var pin rpio.Pin
+		var dur time.Duration
+		switch newPos {
+		case up:
+			pin, dur = s.PinUp, s.DurUp
+		case down:
+			pin, dur = s.PinDown, s.DurDown
+		}
 		muSunscrn.Unlock()
-		move(s.PinDown, s.DurDown)
+		move(pin, dur)
 		muSunscrn.Lock()
 		s.Position = newPos
 		SaveToJSON(s, fileSunscrn)

@@ -332,8 +332,8 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Url options: '/mode/auto" or '/mode/manual/up' or '/mode/manual/down'
-	idMode := req.URL.Path[len("/mode/"):]
-	mode := idMode[strings.Index(idMode, "/")+1:]
+	url := strings.Split(req.URL.Path, "/")
+	mode := fromSlice(url, 2)
 	muSunscrn.Lock()
 	switch mode {
 	case auto:
@@ -344,18 +344,21 @@ func handlerMode(w http.ResponseWriter, req *http.Request) {
 		} else {
 			log.Printf("Mode is already auto (%v)\n", s.Mode)
 		}
-	case manual + "/" + up:
+	case manual:
 		if s.Mode != manual {
+			log.Println("Mode is set to manual")
 			s.Mode = manual
 			SaveToJSON(s, fileSunscrn)
 		}
-		go s.Up()
-	case manual + "/" + down:
-		if s.Mode != manual {
-			s.Mode = manual
-			SaveToJSON(s, fileSunscrn)
+		newPos := fromSlice(url, 3)
+		switch newPos {
+		case up:
+			go s.Up()
+		case down:
+			go s.Down()
+		default:
+			log.Printf("Unknown command for manual position: '%v'", newPos)
 		}
-		go s.Down()
 	default:
 		log.Println("Unknown mode:", req.URL.Path)
 	}
@@ -787,4 +790,13 @@ func handlerStop(w http.ResponseWriter, req *http.Request) {
 	rpio.Close()
 	log.Println("Shutting down")
 	os.Exit(3)
+}
+
+/* FromSlice takes a slice of string and index, and returns the string at
+the index position. If the index is out of range, it returns "".*/
+func fromSlice(s []string, i int) string {
+	if i < len(s) {
+		return s[i]
+	}
+	return ""
 }
