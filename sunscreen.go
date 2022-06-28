@@ -57,10 +57,11 @@ func (s *Sunscreen) init() {
 	s.PinDown.High()
 	s.PinUp.Output()
 	s.PinUp.High()
-	// TODO: implement s.up() and remove manual correction
-	s.Up()
+	// Include below line if sunscreen needs to be repositioned to up
+	// s.Up()
+	// Include below if sunscreen needs to be manually corrected to auto and up
 	// s.Mode = auto
-	// s.Position = down
+	// s.Position = up
 }
 
 // Move moves the suncreen up or down based on the Sunscreen.Position. It updates the position accordingly.
