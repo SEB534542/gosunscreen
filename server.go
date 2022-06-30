@@ -118,7 +118,7 @@ func handlerConfig(w http.ResponseWriter, req *http.Request) {
 		// Store lightsensor config
 		msgsNew := updateLightsensor(req)
 		if len(msgsNew) == 0 {
-			SaveToJSON(s, fileLightsensor)
+			SaveToJSON(ls, fileLightsensor)
 			log.Println("Saved lightsensor")
 		} else {
 			msg := "Unable to save lightsensor, please correct errors"
@@ -475,7 +475,9 @@ func updateSunscreen(req *http.Request) []string {
 			s.SunStop = sunStop
 		}
 	}
+	muSunscrn.Unlock()
 	s.resetAutoTime(0)
+	muSunscrn.Lock()
 	stopLimit, err := time.ParseDuration(req.PostFormValue("StopLimit") + "m")
 	if err != nil {
 		appendMsgs(fmt.Sprintf("Unable to save StopLimit '%v' (%v)", stopLimit, err))
