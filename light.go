@@ -76,7 +76,7 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 		values = append(values, value)
 		i++
 	}
-	x := calcAverage(values...)
+	x := calcAverageZ(values...)
 
 	// Error handling
 	switch {
@@ -84,21 +84,29 @@ func getAvgLight(pin rpio.Pin, freq int) (int, error) {
 		err = fmt.Errorf("All %v attempts failed. Errors:%v", freq, errs)
 	case len(values) != freq:
 		err = fmt.Errorf("%v/%v attempts failed. %v Errors:%v", freq-len(values), freq, values, errs)
+	case x == 0:
+		err = fmt.Errorf("Average is zero")
 	}
 	return x, err
 }
 
-/*CalAverage takes a slice of int and returns the average.
-If the slice is empty, it will return zero as well.*/
-func calcAverage(xi ...int) int {
+/*CalAverageZ takes a slice of int and returns the average,
+omitting al zero values in the slice. If the slice is empty,
+it will return zero as well.*/
+func calcAverageZ(xi ...int) int {
 	if len(xi) == 0 {
 		return 0
 	}
-	total := 0
+	sum := 0
+	count := len(xi)
 	for _, v := range xi {
-		total = total + v
+		if v != 0 {
+			sum += v
+		} else {
+			count -= 1
+		}
 	}
-	return total / len(xi)
+	return sum / count
 }
 
 func (ls *LightSensor) MonitorMove(s *Sunscreen) {
