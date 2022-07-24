@@ -106,6 +106,9 @@ func calcAverageZ(xi ...int) int {
 			count -= 1
 		}
 	}
+	if count == 0 {
+		return 0
+	}
 	return sum / count
 }
 
